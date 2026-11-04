@@ -338,7 +338,7 @@ def height(el):
     if t == "options":
         return 18 + 15 * (_options_layout(el)[1] - 1)
     if t == "yesno":
-        return len(el["qs"]) * 17 + 18 + GAP - 4
+        return len(el["qs"]) * 17 + 28
     if t == "matrix":
         return 18 + len(el["items"]) * el["rh"] + GAP + 2
     if t == "totals":
