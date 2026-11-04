@@ -20,6 +20,7 @@ import re
 from reportlab.lib.colors import HexColor, transparent
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle
+from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.platypus import Paragraph
 from reportlab.pdfgen import canvas
 
@@ -119,7 +120,7 @@ class Doc:
     def header(self):
         c, f = self.c, self.form
         meta = f.get("meta", [])
-        tw = WIDTH - (190 if meta else 0)
+        tw = WIDTH - (200 if meta else 0)
         size = 21
         while c.stringWidth(f["title"], BOLD, size) > tw and size > 13:
             size -= 1
@@ -132,7 +133,9 @@ class Doc:
             c.setFillColor(MUTED)
             c.drawString(MARGIN_X, y, f["subtitle"])
         # meta fields, right aligned, stacked
-        mx, mw = MARGIN_X + WIDTH - 180, 180
+        lw = max([c.stringWidth(m, FONT, 7.5) for m in meta] + [56]) + 6
+        mw = max(180, lw + 110)
+        mx = MARGIN_X + WIDTH - mw
         my = TOP - 2
         for label in meta:
             c.setFont(FONT, 7.5)
@@ -140,8 +143,8 @@ class Doc:
             c.drawString(mx, my - 9, label)
             c.setStrokeColor(LINE)
             c.setLineWidth(0.6)
-            c.line(mx + 62, my - 11, mx + mw, my - 11)
-            self.text(label, mx + 63, my - 10.5, mw - 64, h=12, size=8.5)
+            c.line(mx + lw, my - 11, mx + mw, my - 11)
+            self.text(label, mx + lw + 1, my - 10.5, mw - lw - 2, h=12, size=8.5)
             my -= 16
         self.y = min(y - 14, my - 10)
 
@@ -158,7 +161,11 @@ class Doc:
     # ---- layout loop -------------------------------------------------------
     def build(self):
         self.new_page()
-        body = self.form["body"]
+        body = list(self.form["body"])
+        if not any(e.get("rows") == "fill" or e["t"] == "cards" for e in body):
+            last = [k for k, e in enumerate(body) if e["t"] == "area"]
+            if last:
+                body[last[-1]] = dict(body[last[-1]], grow=True)
         i = 0
         while i < len(body):
             el = body[i]
@@ -175,6 +182,13 @@ class Doc:
                     rest += height(nxt)
                 rows = int((avail - rest - el["head"] - GAP - 3) // el["rh"])
                 el = dict(el, rows=max(rows, el.get("min", 4)))
+            if el.get("grow"):
+                rest = 0
+                for nxt in body[i + 1:]:
+                    if nxt["t"] == "pagebreak":
+                        break
+                    rest += height(nxt)
+                el = dict(el, h=max(el["h"], min(avail - rest - 14 - GAP - 2, 240)))
             h = height(el)
             if h > avail:
                 if el["t"] == "table" and avail > el["head"] + el["rh"] * 4:
@@ -229,6 +243,11 @@ def checklist(items, cols=1, comments=False):
 def groups(mapping, cols=2):
     """Checklist grouped under small headings, flowed into columns."""
     return {"t": "groups", "groups": list(mapping.items()), "cols": cols}
+
+
+def consent(text):
+    """A checkbox followed by a wrapped sentence (agreements, opt-ins)."""
+    return {"t": "consent", "text": text}
 
 
 def area(label, h=60):
@@ -310,12 +329,14 @@ def height(el):
         return _groups_layout(el)[0] + GAP
     if t == "area":
         return el["h"] + 14 + GAP
+    if t == "consent":
+        return _para_h(el["text"], "p", WIDTH - 18) + 8
     if t == "para":
         return _para_h(el["text"], el["style"], WIDTH) + 6
     if t == "rules":
         return sum(_para_h(r, "p", WIDTH - 18) + 4 for r in el["items"]) + 4
     if t == "options":
-        return 18
+        return 18 + 15 * (_options_layout(el)[1] - 1)
     if t == "yesno":
         return len(el["qs"]) * 17 + 18 + GAP - 4
     if t == "matrix":
@@ -530,6 +551,14 @@ def _draw_area(d, el):
     d.y -= el["h"] + 14 + GAP
 
 
+def _draw_consent(d, el):
+    p = Paragraph(el["text"], PARA)
+    _, h = p.wrap(WIDTH - 18, 2000)
+    d.check(el["text"][:40], MARGIN_X, d.y - 11.5, 9)
+    p.drawOn(d.c, MARGIN_X + 18, d.y - h - 2)
+    d.y -= h + 8
+
+
 def _draw_para(d, el):
     p = Paragraph(el["text"], PARA if el["style"] == "p" else SMALL)
     _, h = p.wrap(WIDTH, 2000)
@@ -550,23 +579,39 @@ def _draw_rules(d, el):
     d.y -= 4
 
 
+def _options_layout(el):
+    """Place each choice; wrap onto extra lines when a row runs out of room."""
+    sw = lambda t, f=FONT: stringWidth(t, f, 8.4)
+    x0 = MARGIN_X + sw(el["label"], BOLD) + 12
+    right = MARGIN_X + WIDTH
+    items = [(ch, 13 + sw(ch)) for ch in el["choices"]]
+    if el["other"]:
+        items.append(("Other:", 13 + sw("Other:") + 110))
+    x, line, out = x0, 0, []
+    for ch, w in items:
+        if x + w > right and x > x0:
+            x, line = x0, line + 1
+        out.append((ch, x, line))
+        x += w + 14
+    return out, line + 1
+
+
 def _draw_options(d, el):
     c = d.c
     y = d.y - 12
     _label(c, MARGIN_X, y + 1.5, el["label"], size=8.4, color=INK, bold=True)
-    x = MARGIN_X + c.stringWidth(el["label"], BOLD, 8.4) + 12
-    for ch in el["choices"]:
-        d.check(f"{el['label']} {ch}", x, y, 9)
-        _label(c, x + 13, y + 1.5, ch, size=8.4, color=INK)
-        x += 13 + c.stringWidth(ch, FONT, 8.4) + 14
-    if el["other"]:
-        d.check(f"{el['label']} other", x, y, 9)
-        _label(c, x + 13, y + 1.5, "Other:", size=8.4, color=INK)
-        x += 13 + c.stringWidth("Other:", FONT, 8.4) + 4
-        c.setStrokeColor(LINE)
-        c.line(x, y - 1, MARGIN_X + WIDTH, y - 1)
-        d.text(f"{el['label']} other text", x + 1, y, MARGIN_X + WIDTH - x - 2, h=11, size=8)
-    d.y -= 18
+    places, _ = _options_layout(el)
+    for ch, x, line in places:
+        yy = y - line * 15
+        d.check(f"{el['label']} {ch}", x, yy, 9)
+        _label(c, x + 13, yy + 1.5, ch, size=8.4, color=INK)
+        if el["other"] and ch == "Other:" and (ch, x, line) == places[-1]:
+            lx = x + 13 + c.stringWidth("Other:", FONT, 8.4) + 4
+            c.setStrokeColor(LINE)
+            c.setLineWidth(0.6)
+            c.line(lx, yy - 1, MARGIN_X + WIDTH, yy - 1)
+            d.text(f"{el['label']} other text", lx + 1, yy, MARGIN_X + WIDTH - lx - 2, h=11, size=8)
+    d.y -= height(el)
 
 
 def _draw_yesno(d, el):
@@ -711,6 +756,7 @@ def _draw_cards(d, el):
         d.text("No", MARGIN_X + WIDTH - 121, yt - 23, 112, h=12)
         y = yt - 34
         inner = WIDTH - 24
+        step = min(44, max(28, (ch - 62) / len(el["rows"])))
         for row in el["rows"]:
             total = sum(f[1] for f in row)
             g = 12
@@ -726,7 +772,7 @@ def _draw_cards(d, el):
                 else:
                     d.text(f[0], x + 1, y - 25, w - 2)
                 x += w + g
-            y -= 28
+            y -= step
         if el.get("note"):
             p = Paragraph(el["note"], SMALL)
             _, ph = p.wrap(inner, 200)

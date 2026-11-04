@@ -1,12 +1,11 @@
 """Shared building blocks for Canadian business forms."""
 
-from engine import (area, checklist, fields, groups, matrix, options, pair, para,
+from engine import (area, consent, checklist, fields, groups, matrix, options, pair, para,
                     rating, rules, section, signatures, spacer, table, totals, yesno,
                     cards, pagebreak)
 
-# Province / territory sales tax as printed on the province-specific forms.
-# Rates are pre-filled into editable fields so buyers can update them if a
-# rate changes.
+# Province / territory sales tax as printed on the province-specific forms
+# (rates current as of 2026 - update here and rebuild if a rate changes).
 TAX = {
     "AB": ("Alberta", [("GST", "5%")], []),
     "BC": ("British Columbia", [("GST", "5%"), ("PST", "7%")], ["PST No."]),
