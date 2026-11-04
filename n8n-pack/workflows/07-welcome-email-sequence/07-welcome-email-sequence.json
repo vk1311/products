@@ -1,0 +1,377 @@
+{
+  "name": "07 · New Customer Welcome Email Sequence (3 emails)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "new-customer",
+        "options": {}
+      },
+      "id": "49cb2c50-9311-5e8f-947b-8f53200773b5",
+      "name": "New Customer Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "8c8afec6-1e39-57b6-96dc-6b12cb7e8f83"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d448f2f2-6eb5-5336-b4a8-5fda7dc90e94",
+              "name": "businessName",
+              "value": "Your Business Name",
+              "type": "string"
+            },
+            {
+              "id": "4a546701-0cc4-5e58-86bb-11a634887b6d",
+              "name": "fromEmail",
+              "value": "hello@yourbusiness.com",
+              "type": "string"
+            },
+            {
+              "id": "95d7a9fb-0718-5db2-ac51-619eba5d69d4",
+              "name": "ownerEmail",
+              "value": "you@yourbusiness.com",
+              "type": "string"
+            },
+            {
+              "id": "602c35c8-70b2-58fe-8cda-ca390fc3f8d6",
+              "name": "websiteUrl",
+              "value": "https://yourbusiness.com",
+              "type": "string"
+            },
+            {
+              "id": "9b9f0b08-f3b5-5d23-a234-c903dc3f4fba",
+              "name": "offerCode",
+              "value": "WELCOME10",
+              "type": "string"
+            },
+            {
+              "id": "d9104e0c-5a0d-52c4-9a58-54957205843b",
+              "name": "offerText",
+              "value": "10% off your next order",
+              "type": "string"
+            },
+            {
+              "id": "268f8ad4-48e3-57fb-9dc3-bd5e575f5641",
+              "name": "reviewLink",
+              "value": "https://g.page/r/YOUR_PLACE_ID/review",
+              "type": "string"
+            },
+            {
+              "id": "1de69494-67dc-593c-bf71-cc6e9a5a3d86",
+              "name": "brandColor",
+              "value": "#2563eb",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f349c5b1-caa3-5452-a73d-a847d03fe254",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        300
+      ],
+      "notes": "Edit these values for your business.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1d0df05d-2187-5821-9c50-ac5fcac366ca",
+              "name": "email",
+              "value": "={{ ($('New Customer Webhook').item.json.body.email || '').trim().toLowerCase() }}",
+              "type": "string"
+            },
+            {
+              "id": "a31807d5-20eb-5ce8-aa3e-d0ebb2d95c8c",
+              "name": "firstName",
+              "value": "={{ (($('New Customer Webhook').item.json.body.first_name || $('New Customer Webhook').item.json.body.name || 'there') + '').trim().split(' ')[0] }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b15f6aa4-3a06-56c7-9190-4c0e9431b182",
+      "name": "Customer Details",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "bd6c496b-1321-59e1-abf7-28813ec30a49",
+              "leftValue": "={{ $json.email }}",
+              "rightValue": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "4555b510-a212-52fc-a0d0-944909749aac",
+      "name": "Has Valid Email?",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('Config').first().json.fromEmail }}",
+        "toEmail": "={{ $json.email }}",
+        "subject": "=Welcome to {{ $('Config').first().json.businessName }}, {{ $json.firstName }}! 🎉",
+        "emailFormat": "html",
+        "html": "=<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:560px;margin:0 auto;padding:24px\"><p>Hi {{ $json.firstName }},</p><p>Welcome aboard — we're really glad you're here.</p><p>Here's what happens next:</p><ul><li>You'll hear from us only when we have something useful.</li><li>If you ever need help, just reply to this email — it comes straight to us.</li></ul><p style=\"margin:24px 0\"><a href=\"{{ $('Config').first().json.websiteUrl }}\" style=\"background:{{ $('Config').first().json.brandColor }};color:#ffffff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block\">Visit our website</a></p><p>Thanks again,</p><p style=\"margin-top:32px;color:#6b7280;font-size:13px\">{{ $('Config').first().json.businessName }}</p></div>",
+        "options": {
+          "appendAttribution": false,
+          "replyTo": "={{ $('Config').first().json.ownerEmail }}"
+        }
+      },
+      "id": "806c0325-23ca-50bf-a2b7-28e06c1814d1",
+      "name": "Email 1: Welcome",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        960,
+        300
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 3,
+        "unit": "days"
+      },
+      "id": "79829e70-ce0c-51b2-9011-b0e4f2124956",
+      "name": "Wait 3 Days",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1200,
+        300
+      ],
+      "webhookId": "33412a79-1bb1-5ae8-a54d-ba9986a36742"
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('Config').first().json.fromEmail }}",
+        "toEmail": "={{ $('Customer Details').item.json.email }}",
+        "subject": "=3 ways to get the most from {{ $('Config').first().json.businessName }}",
+        "emailFormat": "html",
+        "html": "=<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:560px;margin:0 auto;padding:24px\"><p>Hi {{ $('Customer Details').item.json.firstName }},</p><p>A few quick tips our favorite customers swear by:</p><ol><li><b>Tip one</b> — replace with your best advice.</li><li><b>Tip two</b> — e.g. how to book or reorder fast.</li><li><b>Tip three</b> — e.g. follow us for exclusive offers.</li></ol><p>Questions? Hit reply any time.</p><p style=\"margin-top:32px;color:#6b7280;font-size:13px\">{{ $('Config').first().json.businessName }}</p></div>",
+        "options": {
+          "appendAttribution": false,
+          "replyTo": "={{ $('Config').first().json.ownerEmail }}"
+        }
+      },
+      "id": "479436be-c0f4-56f4-9f68-d9b88f84b9c2",
+      "name": "Email 2: Tips",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1440,
+        300
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 4,
+        "unit": "days"
+      },
+      "id": "bee6789f-2d8a-518c-97bf-e6f3272e26c5",
+      "name": "Wait 4 Days",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1680,
+        300
+      ],
+      "webhookId": "8343c5c8-a698-5266-ad73-534c2251d6ca"
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('Config').first().json.fromEmail }}",
+        "toEmail": "={{ $('Customer Details').item.json.email }}",
+        "subject": "=A little thank-you, {{ $('Customer Details').item.json.firstName }} 🎁",
+        "emailFormat": "html",
+        "html": "=<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:560px;margin:0 auto;padding:24px\"><p>Hi {{ $('Customer Details').item.json.firstName }},</p><p>Thanks for being one of our customers. Here's <b>{{ $('Config').first().json.offerText }}</b> — just use code:</p><p style=\"font-size:22px;font-weight:bold;letter-spacing:2px\">{{ $('Config').first().json.offerCode }}</p><p>And if you've enjoyed things so far, a quick review would make our day:</p><p style=\"margin:24px 0\"><a href=\"{{ $('Config').first().json.reviewLink }}\" style=\"background:{{ $('Config').first().json.brandColor }};color:#ffffff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block\">Leave a review</a></p><p>Cheers,</p><p style=\"margin-top:32px;color:#6b7280;font-size:13px\">{{ $('Config').first().json.businessName }}</p></div>",
+        "options": {
+          "appendAttribution": false,
+          "replyTo": "={{ $('Config').first().json.ownerEmail }}"
+        }
+      },
+      "id": "7e648081-691b-565b-bb9e-2e284a0076c1",
+      "name": "Email 3: Offer + Review",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1920,
+        300
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## New Customer Welcome Sequence\nSends every new customer a 3-email welcome series over a week: a warm welcome, helpful tips, then a thank-you offer and review request.\n\n### Setup\n1. Fill in **Config**: business name, emails, website, discount code and review link.\n2. Pick your **SMTP** credential on all three email nodes.\n3. Edit the wording of the three emails (especially the tips in *Email 2*).\n4. Activate, copy the **Production URL** from *New Customer Webhook*.\n5. Have your tool send a POST with at least `email` (and ideally `first_name` or `name`) to that URL. Shopify, WooCommerce, Square, Calendly, Typeform, Jotform etc. all support webhooks.\n\nFull guide: README.md in this workflow's folder.",
+        "height": 480,
+        "width": 500,
+        "color": 7
+      },
+      "id": "d851929c-a6f6-515b-a086-2713c0598664",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        220
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "New Customer Webhook": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Customer Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Customer Details": {
+      "main": [
+        [
+          {
+            "node": "Has Valid Email?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Valid Email?": {
+      "main": [
+        [
+          {
+            "node": "Email 1: Welcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email 1: Welcome": {
+      "main": [
+        [
+          {
+            "node": "Wait 3 Days",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 3 Days": {
+      "main": [
+        [
+          {
+            "node": "Email 2: Tips",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email 2: Tips": {
+      "main": [
+        [
+          {
+            "node": "Wait 4 Days",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 4 Days": {
+      "main": [
+        [
+          {
+            "node": "Email 3: Offer + Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

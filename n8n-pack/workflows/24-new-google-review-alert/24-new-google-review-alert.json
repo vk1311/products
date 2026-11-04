@@ -1,0 +1,314 @@
+{
+  "name": "24 · New Google Review Alert (Slack + email for bad reviews)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "0fd5aba4-fdb5-597b-b3f4-c84977c8c7dc",
+      "name": "Every 6 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8076694a-5480-594c-8bca-ef896bfdf311",
+              "name": "placeId",
+              "value": "ChIJ_YOUR_GOOGLE_PLACE_ID",
+              "type": "string"
+            },
+            {
+              "id": "81b310cd-453b-589f-b7e0-b55c0e2aa229",
+              "name": "businessName",
+              "value": "Your Business Name",
+              "type": "string"
+            },
+            {
+              "id": "9d9d9256-b3da-54af-ad16-c40fe6a584c6",
+              "name": "fromEmail",
+              "value": "alerts@yourbusiness.com",
+              "type": "string"
+            },
+            {
+              "id": "62c4bc73-6a53-511b-83b9-50cb582d6b39",
+              "name": "ownerEmail",
+              "value": "you@yourbusiness.com",
+              "type": "string"
+            },
+            {
+              "id": "7e60850f-8b5d-5a14-b12c-21aab12232a6",
+              "name": "slackChannelId",
+              "value": "C0123456789",
+              "type": "string"
+            },
+            {
+              "id": "eb150a3e-deeb-528a-be6b-6c21f38be0d7",
+              "name": "alertAtOrBelow",
+              "value": 3,
+              "type": "number"
+            },
+            {
+              "id": "2d0236db-e0f4-5c9e-b5c5-0ecf5d2e1768",
+              "name": "brandColor",
+              "value": "#2563eb",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "dbb6e00d-c7e0-585b-bffd-84a1f0e61454",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        300
+      ],
+      "notes": "Edit these values for your business.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://places.googleapis.com/v1/places/{{ $('Config').first().json.placeId }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Goog-FieldMask",
+              "value": "displayName,rating,userRatingCount,reviews,googleMapsUri"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1d82495c-8a80-5335-ab99-5ff492d24747",
+      "name": "Get Google Reviews",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Google Places API key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Remembers which reviews it has already seen. The first live run just \"learns\" your existing reviews (no alerts).\n// Manual test runs always show your latest review so you can check the formatting.\nconst cfg = $('Config').first().json;\nconst place = $input.first().json;\nconst reviews = place.reviews || [];\nconst state = $getWorkflowStaticData('global');\nconst seen = new Set(state.seen || []);\nconst isTest = $execution.mode !== 'production';\n\nlet fresh = reviews.filter((r) => !seen.has(r.name));\nif (!state.initialised && !isTest) fresh = [];\nif (isTest) fresh = reviews.slice(0, 1);\nif (!isTest) {\n  state.seen = [...new Set([...reviews.map((r) => r.name), ...seen])].slice(0, 500);\n  state.initialised = true;\n}\nconst stars = (n) => '★'.repeat(n) + '☆'.repeat(5 - n);\nreturn fresh.map((r) => {\n  const rating = Number(r.rating || 0);\n  return { json: {\n    rating, stars: stars(rating),\n    author: r.authorAttribution?.displayName || 'A customer',\n    text: r.text?.text || r.originalText?.text || '(no text, rating only)',\n    when: r.relativePublishTimeDescription || '',\n    link: r.googleMapsUri || place.googleMapsUri || '',\n    overall: `${place.rating ?? '?'}★ from ${place.userRatingCount ?? '?'} reviews`,\n    negative: rating <= Number(cfg.alertAtOrBelow ?? 3),\n    test: isTest,\n  } };\n});\n"
+      },
+      "id": "02abe244-1187-57c5-90f2-d5ef1a844ea6",
+      "name": "Find New Reviews",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "={{ $('Config').first().json.slackChannelId }}",
+          "mode": "id"
+        },
+        "text": "={{ $json.negative ? ':rotating_light: *New ' + $json.rating + '-star review — please respond*' : ':tada: *New ' + $json.rating + '-star review!*' }}{{ $json.test ? ' (test run)' : '' }}\n{{ $json.stars }} by *{{ $json.author }}* · {{ $json.when }}\n>{{ $json.text.slice(0, 600) }}\nOverall: {{ $json.overall }} · <{{ $json.link }}|Open on Google>",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "id": "94358e4e-6698-58f4-bdbb-17756c86d124",
+      "name": "Post Review to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        300
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "10327542-24ef-56fc-aacc-ab0881c56b33",
+              "leftValue": "={{ $('Find New Reviews').item.json.negative }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "ff4a32bb-7fb1-577b-a828-9c9a06c8ad39",
+      "name": "Negative Review?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('Config').first().json.fromEmail }}",
+        "toEmail": "={{ $('Config').first().json.ownerEmail }}",
+        "subject": "=⚠️ New {{ $('Find New Reviews').item.json.rating }}-star Google review from {{ $('Find New Reviews').item.json.author }}",
+        "emailFormat": "html",
+        "html": "=<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:560px;margin:0 auto;padding:24px\"><p>You've received a <b>{{ $('Find New Reviews').item.json.rating }}-star</b> review on Google:</p><p style=\"font-size:20px;color:#f59e0b;margin:0\">{{ $('Find New Reviews').item.json.stars }}</p><p style=\"border-left:3px solid #e5e7eb;padding-left:12px\"><b>{{ $('Find New Reviews').item.json.author }}</b>: {{ $('Find New Reviews').item.json.text }}</p><p><b>Tips:</b> reply within 24 hours, thank them, acknowledge the issue, and offer to make it right offline. Future customers judge you on the reply as much as the review.</p><p style=\"margin:24px 0\"><a href=\"{{ $('Find New Reviews').item.json.link }}\" style=\"background:{{ $('Config').first().json.brandColor }};color:#ffffff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block\">Reply on Google</a></p><p style=\"margin-top:32px;color:#6b7280;font-size:13px\">{{ $('Config').first().json.businessName }}</p></div>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "1b5bbd41-e6c7-5a71-b305-31fe589a1adf",
+      "name": "Email Owner: Respond Fast",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1440,
+        200
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## New Google Review Alert\nChecks your Google Business reviews every 6 hours, posts each new review to Slack, and emails you right away about any bad review so you can respond fast.\n\n### Setup\n1. In Google Cloud Console, create a project, enable **Places API (New)** and create an API key (restrict it to Places API). Google gives a generous free monthly allowance — checking every 6 hours stays well within it.\n2. In n8n, create a **Header Auth** credential: *Name* `X-Goog-Api-Key`, *Value* = your API key. Select it on *Get Google Reviews*.\n3. Find your Place ID with Google's Place ID Finder (search \"Google Place ID Finder\") and paste it into **Config → placeId**.\n4. Fill in the rest of **Config** and pick your **Slack** and **SMTP** credentials.\n5. Click **Activate**. The first live run quietly records your existing reviews; alerts start with the next new one.\n\nFull guide: README.md in this workflow's folder.",
+        "height": 543,
+        "width": 500,
+        "color": 7
+      },
+      "id": "bbf1930e-e8ac-53b1-b2f0-bb970d594086",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        120
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every 6 Hours": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Get Google Reviews",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Google Reviews": {
+      "main": [
+        [
+          {
+            "node": "Find New Reviews",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find New Reviews": {
+      "main": [
+        [
+          {
+            "node": "Post Review to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Review to Slack": {
+      "main": [
+        [
+          {
+            "node": "Negative Review?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Negative Review?": {
+      "main": [
+        [
+          {
+            "node": "Email Owner: Respond Fast",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

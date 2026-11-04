@@ -1,0 +1,601 @@
+{
+  "name": "20 · Abandoned Cart Recovery (2-step email)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cart-abandoned",
+        "options": {}
+      },
+      "id": "1e3e69db-1971-5fba-8e7e-3f1591621688",
+      "name": "Cart Abandoned Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "11b764d0-941c-5215-b617-cbd528a8206c"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "eb24d52c-dfa3-5dd4-be89-62bc3fc3b7ed",
+              "name": "businessName",
+              "value": "Your Business Name",
+              "type": "string"
+            },
+            {
+              "id": "7c6b0a3e-40ea-5d1f-be84-12627ee3f779",
+              "name": "fromEmail",
+              "value": "shop@yourbusiness.com",
+              "type": "string"
+            },
+            {
+              "id": "5b24c688-41dc-5642-97f8-a416331eaf41",
+              "name": "ownerEmail",
+              "value": "you@yourbusiness.com",
+              "type": "string"
+            },
+            {
+              "id": "e350029b-6f0e-5508-afd1-e14d82491cf9",
+              "name": "sheetId",
+              "value": "PASTE_YOUR_GOOGLE_SHEET_ID",
+              "type": "string"
+            },
+            {
+              "id": "bd0b12eb-1a49-521e-9f21-80aa5103c2c4",
+              "name": "discountCode",
+              "value": "COMEBACK10",
+              "type": "string"
+            },
+            {
+              "id": "8efc3560-5900-5009-9c75-d42bde6ed0e7",
+              "name": "discountText",
+              "value": "10% off",
+              "type": "string"
+            },
+            {
+              "id": "cc02180e-c04b-5228-b7fa-a2ee7a0fe127",
+              "name": "timezone",
+              "value": "America/New_York",
+              "type": "string"
+            },
+            {
+              "id": "4cfe6a24-924b-5031-8f38-e14b6dc260f7",
+              "name": "currency",
+              "value": "USD",
+              "type": "string"
+            },
+            {
+              "id": "88f3c4e1-0618-51ca-bff9-1465b005e451",
+              "name": "brandColor",
+              "value": "#2563eb",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3bc585f8-c92a-547e-bf44-a087e40fe0c5",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        300
+      ],
+      "notes": "Edit these values for your business.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e447abee-fe52-5508-bd42-a710e24c9c11",
+              "name": "email",
+              "value": "={{ ($('Cart Abandoned Webhook').item.json.body.email || '').trim().toLowerCase() }}",
+              "type": "string"
+            },
+            {
+              "id": "d53f0afa-c4d9-554e-a22d-81eb25b1bf63",
+              "name": "firstName",
+              "value": "={{ (($('Cart Abandoned Webhook').item.json.body.first_name || $('Cart Abandoned Webhook').item.json.body.name || 'there') + '').trim().split(' ')[0] }}",
+              "type": "string"
+            },
+            {
+              "id": "7afe0c00-c9ed-5baa-b326-3f5888a9c9b7",
+              "name": "cartUrl",
+              "value": "={{ $('Cart Abandoned Webhook').item.json.body.cart_url || $('Cart Abandoned Webhook').item.json.body.checkout_url || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "5b9663d5-29de-5a1c-8b40-fb4dda0c6135",
+              "name": "cartTotal",
+              "value": "={{ $('Cart Abandoned Webhook').item.json.body.total || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "b6135c20-d583-5d29-8977-5b1de0a38c07",
+              "name": "items",
+              "value": "={{ [].concat($('Cart Abandoned Webhook').item.json.body.items || []).map(i => typeof i === 'string' ? i : (i.name || i.title)).filter(Boolean).join(', ') }}",
+              "type": "string"
+            },
+            {
+              "id": "dc06222a-9df7-55be-92b6-2743d73569f0",
+              "name": "createdAt",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "9504bb3a-67b2-5377-8f96-f1677fac67d8",
+      "name": "Cart Details",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "406543be-92d6-5d1d-8b11-2dce3d2b5099",
+              "leftValue": "={{ $json.email }}",
+              "rightValue": "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            },
+            {
+              "id": "7c9286c7-c612-5462-8b25-2629c59db60d",
+              "leftValue": "={{ $json.cartUrl }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "74e8917c-26bd-5c73-a7df-9d303e8634f7",
+      "name": "Has Email & Cart Link?",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 1,
+        "unit": "hours"
+      },
+      "id": "a4d54cc9-e884-53c8-aa67-dc6c651f7f01",
+      "name": "Wait 1 Hour",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        300
+      ],
+      "webhookId": "99773cce-6b89-5678-8652-86452f350d78"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Config').first().json.sheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sales",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "bec74f0c-f87b-5c95-b163-3f609786ae4b",
+      "name": "Check Sales Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1200,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Google Sheets account"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ---- helpers (shared by the workflows in this pack) ----\nconst cfg = $('Config').first().json;\nconst zone = cfg.timezone || 'UTC';\nconst now = DateTime.now().setZone(zone);\nconst today = now.startOf('day');\n\n// Read the first non-empty value among several possible column names.\nconst val = (row, ...keys) => {\n  for (const k of keys) {\n    const v = row[k];\n    if (v !== undefined && v !== null && String(v).trim() !== '') return String(v).trim();\n  }\n  return '';\n};\n\n// Accepts 2026-11-20, 2026-11-20T14:30, 11/20/2026, 20.11.2026, Nov 20, 2026 or a Sheets serial number.\nfunction parseDate(v) {\n  if (v === undefined || v === null || v === '') return null;\n  if (typeof v === 'number') {\n    return DateTime.fromMillis(Math.round((v - 25569) * 86400000), { zone: 'utc' })\n      .setZone(zone, { keepLocalTime: true });\n  }\n  const s = String(v).trim();\n  let d = DateTime.fromISO(s, { zone });\n  if (d.isValid) return d;\n  d = DateTime.fromSQL(s, { zone });\n  if (d.isValid) return d;\n  for (const f of ['M/d/yyyy', 'M/d/yyyy H:mm', 'M/d/yyyy h:mm a', 'M/d/yy', 'd.M.yyyy', 'yyyy/M/d', 'd MMM yyyy', 'MMM d, yyyy', 'MMMM d, yyyy']) {\n    d = DateTime.fromFormat(s, f, { zone });\n    if (d.isValid) return d;\n  }\n  const js = new Date(s);\n  return isNaN(js) ? null : DateTime.fromJSDate(js).setZone(zone);\n}\n\n// Whole days between a date and today (positive = in the past).\nconst daysAgo = (d) => Math.round(today.diff(d.startOf('day'), 'days').days);\n\nconst firstName = (name) => (String(name || '').trim().split(/\\s+/)[0] || 'there');\n\nconst toNumber = (v) => {\n  if (typeof v === 'number') return v;\n  const n = parseFloat(String(v ?? '').replace(/[^0-9.\\-]/g, ''));\n  return isNaN(n) ? 0 : n;\n};\n\nfunction money(amount, currency) {\n  const cur = (currency || cfg.currency || 'USD').toUpperCase();\n  try {\n    return new Intl.NumberFormat(cfg.locale || 'en-US', { style: 'currency', currency: cur }).format(toNumber(amount));\n  } catch (e) {\n    return cur + ' ' + toNumber(amount).toFixed(2);\n  }\n}\n\nconst esc = (s) => String(s ?? '').replace(/[&<>\"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' }[c]));\n\nconst button = (url, label) => url\n  ? `<p style=\"margin:24px 0\"><a href=\"${esc(url)}\" style=\"background:${cfg.brandColor || '#2563eb'};color:#ffffff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block\">${esc(label)}</a></p>`\n  : '';\n\n// Wraps body HTML in a clean, mobile-friendly email layout.\nconst layout = (inner) => `<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:560px;margin:0 auto;padding:24px\">${inner}<p style=\"margin-top:32px;color:#6b7280;font-size:13px\">${esc(cfg.businessName || '')}</p></div>`;\n// ---- end helpers ----\n\n// Did this person buy since abandoning the cart? Looks for their email in the Sales sheet.\nconst cart = $('Cart Details').first().json;\nconst since = DateTime.fromISO(cart.createdAt).setZone(zone).startOf('day');\nconst purchased = $input.all().some((it) => {\n  const r = it.json;\n  const d = parseDate(r['Date']);\n  return val(r, 'Customer Email').toLowerCase() === cart.email && d && d >= since;\n});\nreturn [{ json: { ...cart, purchased } }];\n"
+      },
+      "id": "f705034a-4cb5-5b9b-8114-112b18bba66f",
+      "name": "Purchased Yet?",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "54d0c4d3-ec5e-57eb-932e-b3d55f75c5ff",
+              "leftValue": "={{ $json.purchased }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "bf7bfb3c-b86a-57dc-b2b3-c269b420a099",
+      "name": "Still Not Purchased?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('Config').first().json.fromEmail }}",
+        "toEmail": "={{ $('Cart Details').item.json.email }}",
+        "subject": "=Did you forget something, {{ $('Cart Details').item.json.firstName }}?",
+        "emailFormat": "html",
+        "html": "=<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:560px;margin:0 auto;padding:24px\"><p>Hi {{ $('Cart Details').item.json.firstName }},</p><p>You left a few things in your cart{{ $('Cart Details').item.json.items ? ': <b>' + $('Cart Details').item.json.items + '</b>' : '' }}. We've saved it for you.</p><p style=\"margin:24px 0\"><a href=\"{{ $('Cart Details').item.json.cartUrl }}\" style=\"background:{{ $('Config').first().json.brandColor }};color:#ffffff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block\">Return to my cart</a></p><p>Questions about sizing, delivery or anything else? Just reply — a real person will answer.</p><p style=\"margin-top:32px;color:#6b7280;font-size:13px\">{{ $('Config').first().json.businessName }}</p></div>",
+        "options": {
+          "appendAttribution": false,
+          "replyTo": "={{ $('Config').first().json.ownerEmail }}"
+        }
+      },
+      "id": "1b87c03a-1abc-5f79-aa2e-19dd67d4d443",
+      "name": "Email 1: You Left Something",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1920,
+        300
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 23,
+        "unit": "hours"
+      },
+      "id": "c340cf9c-f9af-5a7a-97d3-f68977dd6fd9",
+      "name": "Wait 23 Hours",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2160,
+        300
+      ],
+      "webhookId": "7a624d39-1c5b-53e7-ad17-491fd6553fb0"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Config').first().json.sheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sales",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "adaa56a7-c43f-5b3c-bbb4-2269d2a67633",
+      "name": "Check Sales Sheet Again",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        2400,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Google Sheets account"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ---- helpers (shared by the workflows in this pack) ----\nconst cfg = $('Config').first().json;\nconst zone = cfg.timezone || 'UTC';\nconst now = DateTime.now().setZone(zone);\nconst today = now.startOf('day');\n\n// Read the first non-empty value among several possible column names.\nconst val = (row, ...keys) => {\n  for (const k of keys) {\n    const v = row[k];\n    if (v !== undefined && v !== null && String(v).trim() !== '') return String(v).trim();\n  }\n  return '';\n};\n\n// Accepts 2026-11-20, 2026-11-20T14:30, 11/20/2026, 20.11.2026, Nov 20, 2026 or a Sheets serial number.\nfunction parseDate(v) {\n  if (v === undefined || v === null || v === '') return null;\n  if (typeof v === 'number') {\n    return DateTime.fromMillis(Math.round((v - 25569) * 86400000), { zone: 'utc' })\n      .setZone(zone, { keepLocalTime: true });\n  }\n  const s = String(v).trim();\n  let d = DateTime.fromISO(s, { zone });\n  if (d.isValid) return d;\n  d = DateTime.fromSQL(s, { zone });\n  if (d.isValid) return d;\n  for (const f of ['M/d/yyyy', 'M/d/yyyy H:mm', 'M/d/yyyy h:mm a', 'M/d/yy', 'd.M.yyyy', 'yyyy/M/d', 'd MMM yyyy', 'MMM d, yyyy', 'MMMM d, yyyy']) {\n    d = DateTime.fromFormat(s, f, { zone });\n    if (d.isValid) return d;\n  }\n  const js = new Date(s);\n  return isNaN(js) ? null : DateTime.fromJSDate(js).setZone(zone);\n}\n\n// Whole days between a date and today (positive = in the past).\nconst daysAgo = (d) => Math.round(today.diff(d.startOf('day'), 'days').days);\n\nconst firstName = (name) => (String(name || '').trim().split(/\\s+/)[0] || 'there');\n\nconst toNumber = (v) => {\n  if (typeof v === 'number') return v;\n  const n = parseFloat(String(v ?? '').replace(/[^0-9.\\-]/g, ''));\n  return isNaN(n) ? 0 : n;\n};\n\nfunction money(amount, currency) {\n  const cur = (currency || cfg.currency || 'USD').toUpperCase();\n  try {\n    return new Intl.NumberFormat(cfg.locale || 'en-US', { style: 'currency', currency: cur }).format(toNumber(amount));\n  } catch (e) {\n    return cur + ' ' + toNumber(amount).toFixed(2);\n  }\n}\n\nconst esc = (s) => String(s ?? '').replace(/[&<>\"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' }[c]));\n\nconst button = (url, label) => url\n  ? `<p style=\"margin:24px 0\"><a href=\"${esc(url)}\" style=\"background:${cfg.brandColor || '#2563eb'};color:#ffffff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block\">${esc(label)}</a></p>`\n  : '';\n\n// Wraps body HTML in a clean, mobile-friendly email layout.\nconst layout = (inner) => `<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:560px;margin:0 auto;padding:24px\">${inner}<p style=\"margin-top:32px;color:#6b7280;font-size:13px\">${esc(cfg.businessName || '')}</p></div>`;\n// ---- end helpers ----\n\n// Did this person buy since abandoning the cart? Looks for their email in the Sales sheet.\nconst cart = $('Cart Details').first().json;\nconst since = DateTime.fromISO(cart.createdAt).setZone(zone).startOf('day');\nconst purchased = $input.all().some((it) => {\n  const r = it.json;\n  const d = parseDate(r['Date']);\n  return val(r, 'Customer Email').toLowerCase() === cart.email && d && d >= since;\n});\nreturn [{ json: { ...cart, purchased } }];\n"
+      },
+      "id": "bc451d3e-92ca-52e7-9c2a-efad6f7dbb30",
+      "name": "Purchased Yet? (2)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "01fdda5b-b285-5e10-bc78-b7bdc7cc332d",
+              "leftValue": "={{ $json.purchased }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "9a066e12-0fc1-520b-8028-03b9b7523032",
+      "name": "Still Not Purchased? (2)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2880,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('Config').first().json.fromEmail }}",
+        "toEmail": "={{ $('Cart Details').item.json.email }}",
+        "subject": "=Here's {{ $('Config').first().json.discountText }} to complete your order 🎁",
+        "emailFormat": "html",
+        "html": "=<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:560px;margin:0 auto;padding:24px\"><p>Hi {{ $('Cart Details').item.json.firstName }},</p><p>Still thinking it over? Here's <b>{{ $('Config').first().json.discountText }}</b> to make the decision a little easier — valid for the next 48 hours:</p><p style=\"font-size:22px;font-weight:bold;letter-spacing:2px\">{{ $('Config').first().json.discountCode }}</p><p style=\"margin:24px 0\"><a href=\"{{ $('Cart Details').item.json.cartUrl }}\" style=\"background:{{ $('Config').first().json.brandColor }};color:#ffffff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block\">Complete my order</a></p><p>Thanks for shopping with us!</p><p style=\"margin-top:32px;color:#6b7280;font-size:13px\">{{ $('Config').first().json.businessName }}</p></div>",
+        "options": {
+          "appendAttribution": false,
+          "replyTo": "={{ $('Config').first().json.ownerEmail }}"
+        }
+      },
+      "id": "e28ffa6c-0234-5606-8f7b-cbef99bae5d4",
+      "name": "Email 2: Discount Offer",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        3120,
+        300
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Abandoned Cart Recovery\nWins back lost sales: 1 hour after someone abandons their cart, sends a friendly reminder; 24 hours later, if they still haven't bought, sends a discount code.\n\n### Setup\n1. Make sure purchases land in a **Sales** sheet with a `Customer Email` and `Date` column (workflow 09 does this for Stripe). See `sheet-Sales.csv`.\n2. Fill in **Config** (emails, sheet ID, discount code). Create the discount code in your shop first.\n3. Pick your **Google Sheets** (2 nodes) and **SMTP** (2 nodes) credentials.\n4. Activate, copy the **Production URL** from *Cart Abandoned Webhook*, and have your shop/checkout POST to it with: `email`, `first_name`, `cart_url`, optional `items` (list of names) and `total`.\n\nFull guide: README.md in this workflow's folder.",
+        "height": 459,
+        "width": 500,
+        "color": 7
+      },
+      "id": "b6b00696-40fe-5583-83ec-08bd50ae785d",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        220
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Cart Abandoned Webhook": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Cart Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cart Details": {
+      "main": [
+        [
+          {
+            "node": "Has Email & Cart Link?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Email & Cart Link?": {
+      "main": [
+        [
+          {
+            "node": "Wait 1 Hour",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 1 Hour": {
+      "main": [
+        [
+          {
+            "node": "Check Sales Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Sales Sheet": {
+      "main": [
+        [
+          {
+            "node": "Purchased Yet?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Purchased Yet?": {
+      "main": [
+        [
+          {
+            "node": "Still Not Purchased?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Still Not Purchased?": {
+      "main": [
+        [
+          {
+            "node": "Email 1: You Left Something",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email 1: You Left Something": {
+      "main": [
+        [
+          {
+            "node": "Wait 23 Hours",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 23 Hours": {
+      "main": [
+        [
+          {
+            "node": "Check Sales Sheet Again",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Sales Sheet Again": {
+      "main": [
+        [
+          {
+            "node": "Purchased Yet? (2)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Purchased Yet? (2)": {
+      "main": [
+        [
+          {
+            "node": "Still Not Purchased? (2)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Still Not Purchased? (2)": {
+      "main": [
+        [
+          {
+            "node": "Email 2: Discount Offer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

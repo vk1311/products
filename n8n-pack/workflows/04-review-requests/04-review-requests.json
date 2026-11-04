@@ -1,0 +1,357 @@
+{
+  "name": "04 · Google Review Requests after a completed job",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 10,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "d5cd0d6d-c8f3-5d49-b71e-b73f7d6aa7bc",
+      "name": "Every Day 10am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "70b6360c-16e2-5760-aa3b-52ac1d9db6a4",
+              "name": "businessName",
+              "value": "Your Business Name",
+              "type": "string"
+            },
+            {
+              "id": "23713811-e6e0-556c-88bb-b23db6bc4850",
+              "name": "fromEmail",
+              "value": "hello@yourbusiness.com",
+              "type": "string"
+            },
+            {
+              "id": "12f9ef89-13f2-51ea-8dc2-0629452b2fb8",
+              "name": "ownerEmail",
+              "value": "you@yourbusiness.com",
+              "type": "string"
+            },
+            {
+              "id": "2c7a558c-25d4-58dc-ba76-908cdf67d910",
+              "name": "sheetId",
+              "value": "PASTE_YOUR_GOOGLE_SHEET_ID",
+              "type": "string"
+            },
+            {
+              "id": "a6fcf131-6f69-5868-b041-58bebd5cea50",
+              "name": "reviewLink",
+              "value": "https://g.page/r/YOUR_PLACE_ID/review",
+              "type": "string"
+            },
+            {
+              "id": "b5035c9c-de96-5f50-b502-ee45f2c49f80",
+              "name": "delayDays",
+              "value": 1,
+              "type": "number"
+            },
+            {
+              "id": "f70d3890-8a23-52ad-962b-1f5de227d095",
+              "name": "timezone",
+              "value": "America/New_York",
+              "type": "string"
+            },
+            {
+              "id": "5ca795f2-1791-54b3-b7ed-26cd4b485258",
+              "name": "twilioFrom",
+              "value": "+15550001111",
+              "type": "string"
+            },
+            {
+              "id": "a7e7a4bc-db4d-58fe-af3d-a022d7d4992d",
+              "name": "brandColor",
+              "value": "#2563eb",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3facbe5d-bbc6-54e8-94bd-c092fc44e793",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        300
+      ],
+      "notes": "Edit these values for your business.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Config').first().json.sheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Jobs",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "4d907ad0-b3b7-59c6-89ce-d23a8f556477",
+      "name": "Get Completed Jobs",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        480,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Google Sheets account"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ---- helpers (shared by the workflows in this pack) ----\nconst cfg = $('Config').first().json;\nconst zone = cfg.timezone || 'UTC';\nconst now = DateTime.now().setZone(zone);\nconst today = now.startOf('day');\n\n// Read the first non-empty value among several possible column names.\nconst val = (row, ...keys) => {\n  for (const k of keys) {\n    const v = row[k];\n    if (v !== undefined && v !== null && String(v).trim() !== '') return String(v).trim();\n  }\n  return '';\n};\n\n// Accepts 2026-11-20, 2026-11-20T14:30, 11/20/2026, 20.11.2026, Nov 20, 2026 or a Sheets serial number.\nfunction parseDate(v) {\n  if (v === undefined || v === null || v === '') return null;\n  if (typeof v === 'number') {\n    return DateTime.fromMillis(Math.round((v - 25569) * 86400000), { zone: 'utc' })\n      .setZone(zone, { keepLocalTime: true });\n  }\n  const s = String(v).trim();\n  let d = DateTime.fromISO(s, { zone });\n  if (d.isValid) return d;\n  d = DateTime.fromSQL(s, { zone });\n  if (d.isValid) return d;\n  for (const f of ['M/d/yyyy', 'M/d/yyyy H:mm', 'M/d/yyyy h:mm a', 'M/d/yy', 'd.M.yyyy', 'yyyy/M/d', 'd MMM yyyy', 'MMM d, yyyy', 'MMMM d, yyyy']) {\n    d = DateTime.fromFormat(s, f, { zone });\n    if (d.isValid) return d;\n  }\n  const js = new Date(s);\n  return isNaN(js) ? null : DateTime.fromJSDate(js).setZone(zone);\n}\n\n// Whole days between a date and today (positive = in the past).\nconst daysAgo = (d) => Math.round(today.diff(d.startOf('day'), 'days').days);\n\nconst firstName = (name) => (String(name || '').trim().split(/\\s+/)[0] || 'there');\n\nconst toNumber = (v) => {\n  if (typeof v === 'number') return v;\n  const n = parseFloat(String(v ?? '').replace(/[^0-9.\\-]/g, ''));\n  return isNaN(n) ? 0 : n;\n};\n\nfunction money(amount, currency) {\n  const cur = (currency || cfg.currency || 'USD').toUpperCase();\n  try {\n    return new Intl.NumberFormat(cfg.locale || 'en-US', { style: 'currency', currency: cur }).format(toNumber(amount));\n  } catch (e) {\n    return cur + ' ' + toNumber(amount).toFixed(2);\n  }\n}\n\nconst esc = (s) => String(s ?? '').replace(/[&<>\"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' }[c]));\n\nconst button = (url, label) => url\n  ? `<p style=\"margin:24px 0\"><a href=\"${esc(url)}\" style=\"background:${cfg.brandColor || '#2563eb'};color:#ffffff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block\">${esc(label)}</a></p>`\n  : '';\n\n// Wraps body HTML in a clean, mobile-friendly email layout.\nconst layout = (inner) => `<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:560px;margin:0 auto;padding:24px\">${inner}<p style=\"margin-top:32px;color:#6b7280;font-size:13px\">${esc(cfg.businessName || '')}</p></div>`;\n// ---- end helpers ----\n\n// Ask for a review X days after the job (Config → delayDays), but never for jobs older than 30 days\n// and never twice.\nconst delay = Number(cfg.delayDays ?? 1);\nconst out = [];\n$input.all().forEach((item, i) => {\n  const r = item.json;\n  if (val(r, 'Review Requested')) return;\n  const email = val(r, 'Customer Email');\n  const done = parseDate(r['Completed Date']);\n  if (!email || !done || !val(r, 'Job ID')) return;\n  const days = daysAgo(done);\n  if (days < delay || days > 30) return;\n  out.push({\n    json: { jobId: val(r, 'Job ID'), name: firstName(val(r, 'Customer Name')), email, phone: val(r, 'Customer Phone'), today: today.toISODate() },\n    pairedItem: { item: i },\n  });\n});\nreturn out;\n"
+      },
+      "id": "e76e380a-82cc-589d-af68-2ae7564e89ac",
+      "name": "Find Customers to Ask",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('Config').first().json.fromEmail }}",
+        "toEmail": "={{ $json.email }}",
+        "subject": "=Quick favor, {{ $json.name }}? ⭐",
+        "emailFormat": "html",
+        "html": "=<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:560px;margin:0 auto;padding:24px\"><p>Hi {{ $json.name }},</p><p>Thank you for choosing {{ $('Config').first().json.businessName }}! We hope you're happy with the result.</p><p>Would you take 30 seconds to leave us a review? It helps other people find us and means a lot to a small business like ours.</p><p style=\"margin:24px 0\"><a href=\"{{ $('Config').first().json.reviewLink }}\" style=\"background:{{ $('Config').first().json.brandColor }};color:#ffffff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block\">Leave a review</a></p><p>If anything wasn't perfect, just reply to this email — we'd love the chance to fix it.</p><p>Thank you!</p><p style=\"margin-top:32px;color:#6b7280;font-size:13px\">{{ $('Config').first().json.businessName }}</p></div>",
+        "options": {
+          "appendAttribution": false,
+          "replyTo": "={{ $('Config').first().json.ownerEmail }}"
+        }
+      },
+      "id": "7734c3b8-2905-5864-b7a9-cd82d4383a90",
+      "name": "Email Review Request",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        960,
+        300
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "from": "={{ $('Config').first().json.twilioFrom }}",
+        "to": "={{ $('Find Customers to Ask').item.json.phone }}",
+        "message": "=Hi {{ $('Find Customers to Ask').item.json.name }}, thanks for choosing {{ $('Config').first().json.businessName }}! Would you mind leaving us a quick review? {{ $('Config').first().json.reviewLink }}",
+        "options": {}
+      },
+      "id": "de915b0d-5acd-565e-8e79-4ab52b435279",
+      "name": "Text Review Request (optional)",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1200,
+        300
+      ],
+      "credentials": {
+        "twilioApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Twilio account"
+        }
+      },
+      "notes": "Enable this node (and add a Twilio credential) to also send an SMS. Phones must be in +15551234567 format.",
+      "onError": "continueRegularOutput",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Config').first().json.sheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Jobs",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Job ID": "={{ $('Find Customers to Ask').item.json.jobId }}",
+            "Review Requested": "Yes",
+            "Review Requested Date": "={{ $('Find Customers to Ask').item.json.today }}"
+          },
+          "matchingColumns": [
+            "Job ID"
+          ],
+          "schema": [
+            {
+              "id": "Job ID",
+              "displayName": "Job ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Review Requested",
+              "displayName": "Review Requested",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Review Requested Date",
+              "displayName": "Review Requested Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "1a44edcf-7892-5403-92fb-b4d6a7cdec7a",
+      "name": "Mark as Requested",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1440,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Google Review Requests\nAutomatically asks happy customers for a Google review a day after their job is done — by email, and optionally by SMS.\n\n### Setup\n1. Get your Google review link: Google Business Profile → *Ask for reviews* → copy the link (looks like `https://g.page/r/.../review`).\n2. Create a sheet tab named **Jobs** with the headers in `sheet-Jobs.csv`.\n3. Fill in **Config**: business name, emails, sheet ID, review link, timezone.\n4. Pick credentials: **Google Sheets** (2 nodes) and **SMTP** (*Email Review Request*).\n5. Optional SMS: right-click *Text Review Request (optional)* → **Activate**, add your **Twilio** credential and set `twilioFrom` in Config.\n6. Add a row whenever you finish a job (or connect your booking/invoicing tool to the sheet), then click **Activate**.\n\nFull guide: README.md in this workflow's folder.",
+        "height": 543,
+        "width": 500,
+        "color": 7
+      },
+      "id": "d893c10b-d793-51c4-8343-f58e670eb0ac",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        220
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every Day 10am": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Get Completed Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Completed Jobs": {
+      "main": [
+        [
+          {
+            "node": "Find Customers to Ask",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Customers to Ask": {
+      "main": [
+        [
+          {
+            "node": "Email Review Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Review Request": {
+      "main": [
+        [
+          {
+            "node": "Text Review Request (optional)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Text Review Request (optional)": {
+      "main": [
+        [
+          {
+            "node": "Mark as Requested",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

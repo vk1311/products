@@ -1,0 +1,475 @@
+{
+  "name": "06 · Social Media Cross-Posting (X, LinkedIn, Facebook, Telegram)",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Publish a social post",
+        "formDescription": "Write once, post everywhere.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Post text",
+              "fieldType": "textarea",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Link (optional)",
+              "placeholder": "https://..."
+            },
+            {
+              "fieldLabel": "Post to",
+              "fieldType": "checkbox",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "X (Twitter)"
+                  },
+                  {
+                    "option": "LinkedIn"
+                  },
+                  {
+                    "option": "Facebook Page"
+                  },
+                  {
+                    "option": "Telegram Channel"
+                  }
+                ]
+              },
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {
+          "appendAttribution": false,
+          "respondWithOptions": {
+            "values": {
+              "respondWith": "text",
+              "formSubmittedText": "Done! Your post is being published."
+            }
+          }
+        }
+      },
+      "id": "65bacab2-a24f-5197-9571-dc13a7a4626d",
+      "name": "New Post Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        400
+      ],
+      "webhookId": "c271711c-5064-55f3-8cc3-27d82188df61"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "d96986c9-8607-50df-8e3e-cf01e92a4636",
+              "name": "facebookPageId",
+              "value": "YOUR_FACEBOOK_PAGE_ID",
+              "type": "string"
+            },
+            {
+              "id": "787b5257-64fb-50e4-b1f6-e6cccb210e5e",
+              "name": "telegramChannel",
+              "value": "@yourchannel",
+              "type": "string"
+            },
+            {
+              "id": "44631b91-f172-5025-9d9c-4ebb56b2eba6",
+              "name": "linkedinPersonId",
+              "value": "YOUR_LINKEDIN_PERSON_ID",
+              "type": "string"
+            },
+            {
+              "id": "9eeefdc7-9b22-5b41-883b-2ff469861ef7",
+              "name": "hashtags",
+              "value": "#smallbusiness",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "900eb3ef-f749-5199-a52e-7ac2f3855f41",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        400
+      ],
+      "notes": "Edit these values for your business.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Builds one version of the post per platform (X is limited to 280 characters).\nconst cfg = $('Config').first().json;\nconst f = $('New Post Form').first().json;\nconst text = String(f['Post text'] || '').trim();\nconst link = String(f['Link (optional)'] || '').trim();\nconst tags = String(cfg.hashtags || '').trim();\nconst full = [text, link, tags].filter(Boolean).join('\\n\\n');\n\n// X counts every link as 23 characters.\nconst xBudget = 280 - (link ? 25 : 0) - (tags ? tags.length + 2 : 0);\nconst xText = (text.length > xBudget ? text.slice(0, xBudget - 1).trimEnd() + '…' : text);\nconst platforms = [].concat(f['Post to'] || []);\nreturn [{\n  json: {\n    full,\n    xPost: [xText, link, tags].filter(Boolean).join('\\n\\n'),\n    link,\n    toX: platforms.includes('X (Twitter)'),\n    toLinkedIn: platforms.includes('LinkedIn'),\n    toFacebook: platforms.includes('Facebook Page'),\n    toTelegram: platforms.includes('Telegram Channel'),\n  },\n}];\n"
+      },
+      "id": "7415eaa8-9219-565b-8a97-1a94264cb494",
+      "name": "Prepare Post",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "087fed9b-0532-5347-855a-3f247834747c",
+              "leftValue": "={{ $json.toX }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "4161c3a6-c395-536e-bf13-7d878b130703",
+      "name": "X Selected?",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "bf88fc70-404d-5da6-8a13-75e6b11a3196",
+              "leftValue": "={{ $json.toLinkedIn }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "1a83dabe-29cc-5926-9058-c8b46845a952",
+      "name": "LinkedIn Selected?",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "099dc0fe-b99a-5109-96bb-866b15465c98",
+              "leftValue": "={{ $json.toFacebook }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "68386f0a-9c23-59b4-ac02-bde2d4c0c050",
+      "name": "Facebook Selected?",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "d6496bec-f87b-55c3-83fe-a84ea7e7541d",
+              "leftValue": "={{ $json.toTelegram }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "df350248-7885-5df2-9efa-5cc7a1b02bdb",
+      "name": "Telegram Selected?",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "text": "={{ $json.xPost }}",
+        "additionalFields": {}
+      },
+      "id": "ca9e6d8e-d8ef-5f4d-a094-993fbbe4d03d",
+      "name": "Post to X",
+      "type": "n8n-nodes-base.twitter",
+      "typeVersion": 2,
+      "position": [
+        960,
+        100
+      ],
+      "credentials": {
+        "twitterOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "X account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "person": "={{ $('Config').first().json.linkedinPersonId }}",
+        "text": "={{ $json.full }}",
+        "shareMediaCategory": "NONE",
+        "additionalFields": {}
+      },
+      "id": "8db9dd16-d7fd-5efe-b0cd-3c65a6000ab2",
+      "name": "Post to LinkedIn",
+      "type": "n8n-nodes-base.linkedIn",
+      "typeVersion": 1,
+      "position": [
+        960,
+        300
+      ],
+      "credentials": {
+        "linkedInOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "LinkedIn account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpRequestMethod": "POST",
+        "node": "={{ $('Config').first().json.facebookPageId }}",
+        "edge": "feed",
+        "options": {
+          "queryParameters": {
+            "parameter": [
+              {
+                "name": "message",
+                "value": "={{ $json.full }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "bdb8edb2-307a-5eb9-ab5f-fcb2c3c10039",
+      "name": "Post to Facebook Page",
+      "type": "n8n-nodes-base.facebookGraphApi",
+      "typeVersion": 1,
+      "position": [
+        960,
+        500
+      ],
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Facebook Graph account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Config').first().json.telegramChannel }}",
+        "text": "={{ $json.full }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "92bfab9b-25a3-5ae5-8450-177491c7ab1e",
+      "name": "Post to Telegram Channel",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        960,
+        700
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Social Media Cross-Posting\nWrite a post once in a simple form and publish it to X, LinkedIn, your Facebook Page and your Telegram channel in one click.\n\n### Setup\n1. **X:** create an app at developer.x.com, add an *X OAuth2* credential in n8n and select it on *Post to X*.\n2. **LinkedIn:** add a *LinkedIn OAuth2* credential, then open *Post to LinkedIn*, switch *Person* to *From list* and pick yourself — or paste your person ID into Config.\n3. **Facebook:** add a *Facebook Graph API* credential using a **Page** access token (with `pages_manage_posts`), and put your Page ID in **Config → facebookPageId**.\n4. **Telegram:** create a bot with @BotFather, add it as an admin of your channel, add a *Telegram* credential and set **Config → telegramChannel** (e.g. `@mychannel`).\n5. Don't use a platform? Delete its two nodes (\"... Selected?\" and \"Post to ...\") and remove it from the form's *Post to* options.\n6. Activate, then open the form's **Production URL** and bookmark it.\n\nFull guide: README.md in this workflow's folder.",
+        "height": 564,
+        "width": 500,
+        "color": 7
+      },
+      "id": "b5766753-ef4d-538c-b3bd-89b630bfd586",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        20
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "New Post Form": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Prepare Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Post": {
+      "main": [
+        [
+          {
+            "node": "X Selected?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "LinkedIn Selected?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Facebook Selected?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Telegram Selected?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "X Selected?": {
+      "main": [
+        [
+          {
+            "node": "Post to X",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LinkedIn Selected?": {
+      "main": [
+        [
+          {
+            "node": "Post to LinkedIn",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Facebook Selected?": {
+      "main": [
+        [
+          {
+            "node": "Post to Facebook Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Selected?": {
+      "main": [
+        [
+          {
+            "node": "Post to Telegram Channel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

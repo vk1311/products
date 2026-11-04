@@ -1,0 +1,422 @@
+{
+  "name": "25 · Missed Call → Instant Text-Back (Twilio)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "incoming-call",
+        "options": {},
+        "responseMode": "responseNode"
+      },
+      "id": "f4e298d3-66a8-5974-b3b9-cf7b3d9dd260",
+      "name": "Incoming Call (Twilio)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "webhookId": "d7488704-279a-52d8-a418-0252afcb730b"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "call-ended",
+        "options": {},
+        "responseMode": "responseNode"
+      },
+      "id": "390975d3-7e88-565e-8958-94cbac525cd2",
+      "name": "Call Ended (Twilio)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        420
+      ],
+      "webhookId": "b7919b87-d7a0-5b70-87ff-507dd6e60aee"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b0f5bba8-24d5-5569-b643-6c6e4ce8dc9c",
+              "name": "businessName",
+              "value": "Your Business Name",
+              "type": "string"
+            },
+            {
+              "id": "f25ebe4b-d394-55d1-ad7d-cb659555eee3",
+              "name": "forwardToPhone",
+              "value": "+15557654321",
+              "type": "string"
+            },
+            {
+              "id": "b3e0ef61-b97e-5e8f-a909-9df3e7eb2452",
+              "name": "twilioFrom",
+              "value": "+15550001111",
+              "type": "string"
+            },
+            {
+              "id": "a6066976-4432-53c8-865f-080f9da81417",
+              "name": "ringSeconds",
+              "value": 20,
+              "type": "number"
+            },
+            {
+              "id": "6d85e565-f8b8-5e11-b13b-6dfa4cce13b2",
+              "name": "telegramChatId",
+              "value": "123456789",
+              "type": "string"
+            },
+            {
+              "id": "f07694bf-e211-563f-ac38-2f5da297646c",
+              "name": "textBackMessage",
+              "value": "Hi! Sorry we missed your call at Your Business Name. How can we help? Reply here and we'll get right back to you.",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "a0a6142c-9b65-59d5-9e66-9c7f7cd16fdf",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        300
+      ],
+      "notes": "Edit these values for your business.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "7b7ed567-292b-5a83-a79f-37bd45fba467",
+              "leftValue": "={{ $json.body?.DialCallStatus }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "f7011216-2f5b-5800-aeae-2c418981f35a",
+      "name": "Is Call-Ended Callback?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "=<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Response>\n  <Dial timeout=\"{{ $json.ringSeconds }}\" action=\"call-ended\" method=\"POST\">\n    <Number>{{ $json.forwardToPhone }}</Number>\n  </Dial>\n</Response>",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/xml"
+              }
+            ]
+          }
+        }
+      },
+      "id": "24b1915c-26dd-521d-8b05-528c88f59a31",
+      "name": "Forward Call to Your Phone",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        440
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "6d630b77-e0d3-569d-9e87-6a13ebc3ab44",
+              "leftValue": "={{ $json.body.DialCallStatus }}",
+              "rightValue": "completed",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            },
+            {
+              "id": "86dacb5d-3610-50f8-81d1-791d49cd2d76",
+              "leftValue": "={{ $json.body.DialCallStatus }}",
+              "rightValue": "answered",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            },
+            {
+              "id": "47e11f8a-86a4-500d-bbd6-0438c567100f",
+              "leftValue": "={{ $json.body.From }}",
+              "rightValue": "+",
+              "operator": {
+                "type": "string",
+                "operation": "startsWith"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "8e4a6c04-88d0-5f7d-9119-5e9ca58e3da8",
+      "name": "Missed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "from": "={{ $('Config').first().json.twilioFrom }}",
+        "to": "={{ $json.body.From }}",
+        "message": "={{ $json.textBackMessage }}",
+        "options": {}
+      },
+      "id": "47d0a1e2-5292-56fe-b47d-65cca9d71300",
+      "name": "Text the Caller Back",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        960,
+        100
+      ],
+      "credentials": {
+        "twilioApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Twilio account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Config').item.json.telegramChatId }}",
+        "text": "=📵 <b>Missed call</b> from {{ $('Config').item.json.body.From }}{{ $('Config').item.json.body.CallerCity ? ' (' + $('Config').item.json.body.CallerCity + ')' : '' }}\nThey've been sent an automatic text. Replies arrive in your Twilio number's inbox / messaging webhook.",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "b6834a04-d68d-5c98-9bfe-2c5132b369c4",
+      "name": "Tell You on Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1200,
+        100
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Telegram account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "=<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Response>\n  <Say>Sorry we missed your call. We have just sent you a text message and will get back to you shortly. Goodbye.</Say>\n  <Hangup/>\n</Response>",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/xml"
+              }
+            ]
+          }
+        }
+      },
+      "id": "c5b70bfd-463e-536c-9578-8226b8199cdc",
+      "name": "Play Sorry Message",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1440,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "=<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<Response><Hangup/></Response>",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/xml"
+              }
+            ]
+          }
+        }
+      },
+      "id": "a74af4e2-ec05-575c-883a-358212347215",
+      "name": "End Call (answered)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Missed Call → Instant Text-Back\nWhen you can't pick up, the caller instantly gets a friendly text from your business number — so they message you instead of calling your competitor.\n\n### Setup\n1. Buy a phone number in Twilio (or port your existing one). Add a **Twilio** credential in n8n and select it on *Text the Caller Back*.\n2. Fill in **Config**: your mobile number (`forwardToPhone`), your Twilio number (`twilioFrom`), ring time and text message. Use `+countrycode` format.\n3. Add a **Telegram** credential and chat ID (see workflow 09) — or delete the Telegram node.\n4. **Activate** the workflow, open *Incoming Call (Twilio)* and copy its **Production URL**.\n5. In Twilio Console → Phone Numbers → your number → *Voice Configuration*: set **A call comes in** → *Webhook*, paste the URL, method **HTTP POST**. Save.\n6. That's it — the second webhook (*Call Ended*) is called by Twilio automatically (the TwiML uses a relative URL, so no extra setup).\n\nFull guide: README.md in this workflow's folder.",
+        "height": 564,
+        "width": 500,
+        "color": 7
+      },
+      "id": "038b9718-fae4-5302-a9d7-07ceba5a8488",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        20
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Incoming Call (Twilio)": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Ended (Twilio)": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Is Call-Ended Callback?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Call-Ended Callback?": {
+      "main": [
+        [
+          {
+            "node": "Missed?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Forward Call to Your Phone",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Missed?": {
+      "main": [
+        [
+          {
+            "node": "Text the Caller Back",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "End Call (answered)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Text the Caller Back": {
+      "main": [
+        [
+          {
+            "node": "Tell You on Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tell You on Telegram": {
+      "main": [
+        [
+          {
+            "node": "Play Sorry Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

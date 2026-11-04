@@ -1,0 +1,216 @@
+{
+  "name": "01 · Contact Form → Email (owner alert + customer auto-reply)",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Contact us",
+        "formDescription": "Send us a message and we'll get back to you shortly.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Name",
+              "placeholder": "Jane Smith",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Email",
+              "fieldType": "email",
+              "placeholder": "jane@example.com",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Phone",
+              "placeholder": "Optional"
+            },
+            {
+              "fieldLabel": "How can we help?",
+              "fieldType": "textarea",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {
+          "appendAttribution": false,
+          "respondWithOptions": {
+            "values": {
+              "respondWith": "text",
+              "formSubmittedText": "Thanks! Your message is on its way. We'll reply within 1 business day."
+            }
+          }
+        }
+      },
+      "id": "4d9b7dac-ff3d-5c3d-a44a-4dfac4d2100c",
+      "name": "Contact Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "f3a3f3d0-35e1-59c3-af04-83480256a6ca"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "20ced8ca-3b4e-5b7e-9d8c-0460b6c741aa",
+              "name": "businessName",
+              "value": "Your Business Name",
+              "type": "string"
+            },
+            {
+              "id": "6aec1965-5179-554c-8a89-365b78ba71a3",
+              "name": "ownerEmail",
+              "value": "you@yourbusiness.com",
+              "type": "string"
+            },
+            {
+              "id": "dd58906c-2592-52a8-9bec-c2557f71fae9",
+              "name": "fromEmail",
+              "value": "hello@yourbusiness.com",
+              "type": "string"
+            },
+            {
+              "id": "1846d741-501b-5b2f-98b1-efaad9051d51",
+              "name": "replyTime",
+              "value": "1 business day",
+              "type": "string"
+            },
+            {
+              "id": "562d23f6-de41-524c-baca-d27b2424b66c",
+              "name": "brandColor",
+              "value": "#2563eb",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "cf7133ca-0c7d-573e-b3f6-11b57e45aa29",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        300
+      ],
+      "notes": "Edit these values for your business.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('Config').first().json.fromEmail }}",
+        "toEmail": "={{ $('Config').first().json.ownerEmail }}",
+        "subject": "=New inquiry from {{ $('Contact Form').item.json.Name }}",
+        "emailFormat": "html",
+        "html": "=<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:560px;margin:0 auto;padding:24px\"><h2 style=\"margin-top:0\">New website inquiry</h2><p><b>Name:</b> {{ $('Contact Form').item.json.Name }}<br><b>Email:</b> {{ $('Contact Form').item.json.Email }}<br><b>Phone:</b> {{ $('Contact Form').item.json.Phone || '—' }}<br><b>Received:</b> {{ $('Contact Form').item.json.submittedAt }}</p><p><b>Message:</b><br>{{ ($('Contact Form').item.json['How can we help?'] || '').replace(/\\n/g, '<br>') }}</p><p style=\"color:#6b7280\">Just hit Reply to answer them directly.</p><p style=\"margin-top:32px;color:#6b7280;font-size:13px\">{{ $('Config').first().json.businessName }}</p></div>",
+        "options": {
+          "appendAttribution": false,
+          "replyTo": "={{ $('Contact Form').item.json.Email }}"
+        }
+      },
+      "id": "905a1e1a-ce06-5086-a4ee-4dfd380f1903",
+      "name": "Email Owner",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        480,
+        300
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('Config').first().json.fromEmail }}",
+        "toEmail": "={{ $('Contact Form').item.json.Email }}",
+        "subject": "=Thanks for contacting {{ $('Config').first().json.businessName }}",
+        "emailFormat": "html",
+        "html": "=<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:560px;margin:0 auto;padding:24px\"><p>Hi {{ $('Contact Form').item.json.Name.split(' ')[0] }},</p><p>Thanks for getting in touch! We've received your message and a real person will reply within {{ $('Config').first().json.replyTime }}.</p><p style=\"border-left:3px solid #e5e7eb;padding-left:12px;color:#4b5563\">{{ ($('Contact Form').item.json['How can we help?'] || '').replace(/\\n/g, '<br>') }}</p><p>Talk soon,</p><p style=\"margin-top:32px;color:#6b7280;font-size:13px\">{{ $('Config').first().json.businessName }}</p></div>",
+        "options": {
+          "appendAttribution": false,
+          "replyTo": "={{ $('Config').first().json.ownerEmail }}"
+        }
+      },
+      "id": "7c252855-561e-570d-9561-4937723b5b7b",
+      "name": "Auto-Reply to Customer",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        720,
+        300
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Contact Form → Email\nA hosted contact form that emails you every inquiry and sends the customer an instant, friendly auto-reply.\n\n### Setup\n1. Open the **Config** node and fill in your business name, your email, the address emails are sent from, and your usual reply time.\n2. Open **Email Owner** and pick (or create) your **SMTP** credential. Do the same on **Auto-Reply to Customer**.\n3. Optional: open **Contact Form** to change the title, fields or the thank-you message.\n4. Click **Activate**. Open the **Contact Form** node and copy the **Production URL** — that's your form link.\n5. Put the link on your website (button, menu item or `<iframe>`), Google Business Profile, Instagram bio, etc.\n\nFull guide: README.md in this workflow's folder.",
+        "height": 438,
+        "width": 500,
+        "color": 7
+      },
+      "id": "ac16371f-ceee-5675-82b7-8a1629698999",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        220
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Contact Form": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Email Owner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Owner": {
+      "main": [
+        [
+          {
+            "node": "Auto-Reply to Customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

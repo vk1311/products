@@ -1,0 +1,393 @@
+{
+  "name": "12 · No-Show Follow-Up (rebook missed appointments)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 18,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "69d80534-ff54-5b85-8da9-d6c8f5df96a7",
+      "name": "Every Day 6pm",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "95d367eb-2bb9-5be8-96f0-482a51617253",
+              "name": "businessName",
+              "value": "Your Business Name",
+              "type": "string"
+            },
+            {
+              "id": "54c6cca3-b978-53d4-b732-b1cbdaa5d0e0",
+              "name": "fromEmail",
+              "value": "bookings@yourbusiness.com",
+              "type": "string"
+            },
+            {
+              "id": "e0bc3e1a-b876-5a4b-b2b0-df98f519a6e6",
+              "name": "ownerEmail",
+              "value": "you@yourbusiness.com",
+              "type": "string"
+            },
+            {
+              "id": "6d8b6866-1de5-516f-867e-21a6ee3662e3",
+              "name": "sheetId",
+              "value": "PASTE_YOUR_GOOGLE_SHEET_ID",
+              "type": "string"
+            },
+            {
+              "id": "2cd88325-7e2e-5a7f-bc34-167d90024135",
+              "name": "bookingLink",
+              "value": "https://yourbusiness.com/book",
+              "type": "string"
+            },
+            {
+              "id": "bf67562b-1d5f-51e8-8331-62ce9ece0b27",
+              "name": "phoneNumber",
+              "value": "(555) 123-4567",
+              "type": "string"
+            },
+            {
+              "id": "41fce64c-f0e0-5dd5-9b31-3f0c595bbf49",
+              "name": "timezone",
+              "value": "America/New_York",
+              "type": "string"
+            },
+            {
+              "id": "16fca6f5-a45c-523d-b241-ef146f54e4b3",
+              "name": "twilioFrom",
+              "value": "+15550001111",
+              "type": "string"
+            },
+            {
+              "id": "e09c4f35-b004-583e-bcba-e4bd8c661a7b",
+              "name": "brandColor",
+              "value": "#2563eb",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "11225dcf-3130-5593-a832-1e2bd6c603e4",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        300
+      ],
+      "notes": "Edit these values for your business.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Config').first().json.sheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Appointments",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "e6895f47-e9be-5e2a-92ec-d88aceda1043",
+      "name": "Get Appointments",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        480,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Google Sheets account"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ---- helpers (shared by the workflows in this pack) ----\nconst cfg = $('Config').first().json;\nconst zone = cfg.timezone || 'UTC';\nconst now = DateTime.now().setZone(zone);\nconst today = now.startOf('day');\n\n// Read the first non-empty value among several possible column names.\nconst val = (row, ...keys) => {\n  for (const k of keys) {\n    const v = row[k];\n    if (v !== undefined && v !== null && String(v).trim() !== '') return String(v).trim();\n  }\n  return '';\n};\n\n// Accepts 2026-11-20, 2026-11-20T14:30, 11/20/2026, 20.11.2026, Nov 20, 2026 or a Sheets serial number.\nfunction parseDate(v) {\n  if (v === undefined || v === null || v === '') return null;\n  if (typeof v === 'number') {\n    return DateTime.fromMillis(Math.round((v - 25569) * 86400000), { zone: 'utc' })\n      .setZone(zone, { keepLocalTime: true });\n  }\n  const s = String(v).trim();\n  let d = DateTime.fromISO(s, { zone });\n  if (d.isValid) return d;\n  d = DateTime.fromSQL(s, { zone });\n  if (d.isValid) return d;\n  for (const f of ['M/d/yyyy', 'M/d/yyyy H:mm', 'M/d/yyyy h:mm a', 'M/d/yy', 'd.M.yyyy', 'yyyy/M/d', 'd MMM yyyy', 'MMM d, yyyy', 'MMMM d, yyyy']) {\n    d = DateTime.fromFormat(s, f, { zone });\n    if (d.isValid) return d;\n  }\n  const js = new Date(s);\n  return isNaN(js) ? null : DateTime.fromJSDate(js).setZone(zone);\n}\n\n// Whole days between a date and today (positive = in the past).\nconst daysAgo = (d) => Math.round(today.diff(d.startOf('day'), 'days').days);\n\nconst firstName = (name) => (String(name || '').trim().split(/\\s+/)[0] || 'there');\n\nconst toNumber = (v) => {\n  if (typeof v === 'number') return v;\n  const n = parseFloat(String(v ?? '').replace(/[^0-9.\\-]/g, ''));\n  return isNaN(n) ? 0 : n;\n};\n\nfunction money(amount, currency) {\n  const cur = (currency || cfg.currency || 'USD').toUpperCase();\n  try {\n    return new Intl.NumberFormat(cfg.locale || 'en-US', { style: 'currency', currency: cur }).format(toNumber(amount));\n  } catch (e) {\n    return cur + ' ' + toNumber(amount).toFixed(2);\n  }\n}\n\nconst esc = (s) => String(s ?? '').replace(/[&<>\"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' }[c]));\n\nconst button = (url, label) => url\n  ? `<p style=\"margin:24px 0\"><a href=\"${esc(url)}\" style=\"background:${cfg.brandColor || '#2563eb'};color:#ffffff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block\">${esc(label)}</a></p>`\n  : '';\n\n// Wraps body HTML in a clean, mobile-friendly email layout.\nconst layout = (inner) => `<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:560px;margin:0 auto;padding:24px\">${inner}<p style=\"margin-top:32px;color:#6b7280;font-size:13px\">${esc(cfg.businessName || '')}</p></div>`;\n// ---- end helpers ----\n\n// Picks appointments marked \"No-show\" in the last 7 days that haven't been followed up yet.\nconst out = [];\n$input.all().forEach((item, i) => {\n  const r = item.json;\n  const status = val(r, 'Status').toLowerCase().replace(/[\\s_]/g, '-');\n  if (!['no-show', 'noshow', 'missed'].includes(status)) return;\n  if (val(r, 'No-show Followed Up') || !val(r, 'Appointment ID')) return;\n  const d = parseDate(r['Date']);\n  if (!d || daysAgo(d) < 0 || daysAgo(d) > 7) return;\n  out.push({\n    json: {\n      appointmentId: val(r, 'Appointment ID'),\n      name: firstName(val(r, 'Client Name')),\n      email: val(r, 'Client Email'),\n      phone: val(r, 'Client Phone'),\n      service: val(r, 'Service') || 'appointment',\n      today: today.toISODate(),\n    },\n    pairedItem: { item: i },\n  });\n});\nreturn out;\n"
+      },
+      "id": "7081e009-a195-518f-bb2a-bbbe8aa33565",
+      "name": "Find No-Shows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "8c2e6e64-94f7-5a61-8d50-c6b6379a740d",
+              "leftValue": "={{ $json.email }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "da96b137-4d8e-51b0-94a8-1d20c4ef4306",
+      "name": "Has Email?",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('Config').first().json.fromEmail }}",
+        "toEmail": "={{ $json.email }}",
+        "subject": "=We missed you today, {{ $json.name }} — want to rebook?",
+        "emailFormat": "html",
+        "html": "=<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:560px;margin:0 auto;padding:24px\"><p>Hi {{ $json.name }},</p><p>We were sorry to miss you for your <b>{{ $json.service }}</b>. Life happens — no problem at all!</p><p>Grab a new time that suits you here:</p><p style=\"margin:24px 0\"><a href=\"{{ $('Config').first().json.bookingLink }}\" style=\"background:{{ $('Config').first().json.brandColor }};color:#ffffff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block\">Pick a new time</a></p><p>Or reply to this email / call {{ $('Config').first().json.phoneNumber }} and we'll sort it for you.</p><p style=\"margin-top:32px;color:#6b7280;font-size:13px\">{{ $('Config').first().json.businessName }}</p></div>",
+        "options": {
+          "appendAttribution": false,
+          "replyTo": "={{ $('Config').first().json.ownerEmail }}"
+        }
+      },
+      "id": "f6e2b9bb-f3af-579c-87dd-dc369a32ccd0",
+      "name": "Email: Let's Rebook",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1200,
+        300
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "from": "={{ $('Config').first().json.twilioFrom }}",
+        "to": "={{ $('Find No-Shows').item.json.phone }}",
+        "message": "=Hi {{ $('Find No-Shows').item.json.name }}, sorry we missed you today at {{ $('Config').first().json.businessName }}! Rebook any time: {{ $('Config').first().json.bookingLink }}",
+        "options": {}
+      },
+      "id": "177a6107-d713-5a92-bdf0-2d5a93110637",
+      "name": "SMS: Let's Rebook (optional)",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1440,
+        300
+      ],
+      "credentials": {
+        "twilioApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Twilio account"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Enable to also text the client (Twilio credential + Config → twilioFrom).",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Config').first().json.sheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Appointments",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Appointment ID": "={{ $('Find No-Shows').item.json.appointmentId }}",
+            "No-show Followed Up": "={{ $('Find No-Shows').item.json.today }}"
+          },
+          "matchingColumns": [
+            "Appointment ID"
+          ],
+          "schema": [
+            {
+              "id": "Appointment ID",
+              "displayName": "Appointment ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "No-show Followed Up",
+              "displayName": "No-show Followed Up",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e06a75aa-8318-5bfd-979c-302a171dcadd",
+      "name": "Mark Followed Up",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1680,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## No-Show Follow-Up\nTurns missed appointments back into bookings: every evening, sends no-shows a friendly, no-guilt message with a link to rebook.\n\n### Setup\n1. Use the **Appointments** tab from workflow 05 (headers in `sheet-Appointments.csv`).\n2. Fill in **Config**, especially your `bookingLink` (Calendly, Square, Acuity, Fresha, your website...).\n3. Pick your **Google Sheets** (2 nodes) and **SMTP** credentials. Optional: enable the SMS node and add **Twilio**.\n4. When a client doesn't show, set their **Status** to `No-show`. Click **Activate**.\n\nFull guide: README.md in this workflow's folder.",
+        "height": 417,
+        "width": 500,
+        "color": 7
+      },
+      "id": "e0b80ede-e514-594c-ab23-6ac81860629a",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        220
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every Day 6pm": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Get Appointments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Appointments": {
+      "main": [
+        [
+          {
+            "node": "Find No-Shows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find No-Shows": {
+      "main": [
+        [
+          {
+            "node": "Has Email?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Email?": {
+      "main": [
+        [
+          {
+            "node": "Email: Let's Rebook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email: Let's Rebook": {
+      "main": [
+        [
+          {
+            "node": "SMS: Let's Rebook (optional)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SMS: Let's Rebook (optional)": {
+      "main": [
+        [
+          {
+            "node": "Mark Followed Up",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

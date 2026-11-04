@@ -1,0 +1,261 @@
+{
+  "name": "08 · Stripe Failed Payment Recovery (customer email + Slack alert)",
+  "nodes": [
+    {
+      "parameters": {
+        "events": [
+          "invoice.payment_failed"
+        ]
+      },
+      "id": "ac67b81d-28da-521a-8e7a-b3cda99a920a",
+      "name": "Stripe: Payment Failed",
+      "type": "n8n-nodes-base.stripeTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "b223c2be-fa39-571f-a756-6972aad2ce36",
+      "credentials": {
+        "stripeApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Stripe account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2065fde1-6070-56be-9a0b-033af6fa24fc",
+              "name": "businessName",
+              "value": "Your Business Name",
+              "type": "string"
+            },
+            {
+              "id": "dc82de30-d34b-5e24-b903-dccf391ed94f",
+              "name": "fromEmail",
+              "value": "billing@yourbusiness.com",
+              "type": "string"
+            },
+            {
+              "id": "0b0c57bc-2c8e-5026-89b6-bc938d3b7d2b",
+              "name": "ownerEmail",
+              "value": "you@yourbusiness.com",
+              "type": "string"
+            },
+            {
+              "id": "29a69d86-7144-519d-9e19-9db8f1eac26c",
+              "name": "slackChannelId",
+              "value": "C0123456789",
+              "type": "string"
+            },
+            {
+              "id": "8d74e952-eb3f-5ffe-9490-03e6acfe1f25",
+              "name": "brandColor",
+              "value": "#2563eb",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b8494594-ff24-56c4-9ed5-2992fe53f1c6",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        300
+      ],
+      "notes": "Edit these values for your business.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "71e1bb8a-620f-5d70-a0af-bf17f770f3ad",
+              "name": "email",
+              "value": "={{ $('Stripe: Payment Failed').item.json.data.object.customer_email }}",
+              "type": "string"
+            },
+            {
+              "id": "4a4fe280-d55e-5c6c-a6a3-d43227b8871f",
+              "name": "firstName",
+              "value": "={{ ($('Stripe: Payment Failed').item.json.data.object.customer_name || 'there').split(' ')[0] }}",
+              "type": "string"
+            },
+            {
+              "id": "68d57211-53be-51d7-a64c-605fcacf9167",
+              "name": "amount",
+              "value": "={{ (['bif','clp','djf','gnf','jpy','kmf','krw','mga','pyg','rwf','ugx','vnd','vuv','xaf','xof','xpf'].includes($('Stripe: Payment Failed').item.json.data.object.currency) ? $('Stripe: Payment Failed').item.json.data.object.amount_due : $('Stripe: Payment Failed').item.json.data.object.amount_due / 100).toLocaleString('en-US', { style: 'currency', currency: $('Stripe: Payment Failed').item.json.data.object.currency.toUpperCase() }) }}",
+              "type": "string"
+            },
+            {
+              "id": "4a4e6c8f-eb46-5e25-87b6-f8560ac68bc4",
+              "name": "invoiceNumber",
+              "value": "={{ $('Stripe: Payment Failed').item.json.data.object.number || $('Stripe: Payment Failed').item.json.data.object.id }}",
+              "type": "string"
+            },
+            {
+              "id": "2fbba4a4-b407-54b7-977b-01677afc048b",
+              "name": "payUrl",
+              "value": "={{ $('Stripe: Payment Failed').item.json.data.object.hosted_invoice_url }}",
+              "type": "string"
+            },
+            {
+              "id": "ff072014-6ac2-5724-8d5e-16065822635d",
+              "name": "attempt",
+              "value": "={{ $('Stripe: Payment Failed').item.json.data.object.attempt_count }}",
+              "type": "number"
+            },
+            {
+              "id": "2e8e58fa-3878-55a5-a396-0f1764449a1a",
+              "name": "nextRetry",
+              "value": "={{ $('Stripe: Payment Failed').item.json.data.object.next_payment_attempt ? DateTime.fromSeconds($('Stripe: Payment Failed').item.json.data.object.next_payment_attempt).toFormat('d LLL yyyy') : 'none scheduled' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "368a6dd5-0d96-5920-9025-ca8c2cc40542",
+      "name": "Payment Details",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('Config').first().json.fromEmail }}",
+        "toEmail": "={{ $json.email }}",
+        "subject": "=Action needed: your payment to {{ $('Config').first().json.businessName }} didn't go through",
+        "emailFormat": "html",
+        "html": "=<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:560px;margin:0 auto;padding:24px\"><p>Hi {{ $json.firstName }},</p><p>We tried to take your payment of <b>{{ $json.amount }}</b> (invoice {{ $json.invoiceNumber }}) but it was declined. This usually happens when a card expires or the bank flags the charge.</p><p>You can update your card and pay securely here:</p><p style=\"margin:24px 0\"><a href=\"{{ $json.payUrl }}\" style=\"background:{{ $('Config').first().json.brandColor }};color:#ffffff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block\">Update payment</a></p><p>If you have any questions, just reply to this email.</p><p>Thank you!</p><p style=\"margin-top:32px;color:#6b7280;font-size:13px\">{{ $('Config').first().json.businessName }}</p></div>",
+        "options": {
+          "appendAttribution": false,
+          "replyTo": "={{ $('Config').first().json.ownerEmail }}"
+        }
+      },
+      "id": "6fa7e525-936a-51ef-ae70-ec00cd57ee46",
+      "name": "Email Customer",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        720,
+        300
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "={{ $('Config').first().json.slackChannelId }}",
+          "mode": "id"
+        },
+        "text": "=:warning: *Payment failed* — {{ $('Payment Details').item.json.email }} · {{ $('Payment Details').item.json.amount }} · invoice {{ $('Payment Details').item.json.invoiceNumber }}\nAttempt #{{ $('Payment Details').item.json.attempt }} · next automatic retry: {{ $('Payment Details').item.json.nextRetry }}\nCustomer has been emailed a link to update their card.",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "id": "7b64856d-7b7f-5ca6-a9b2-ba06a5a06611",
+      "name": "Alert Team on Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        300
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Stripe Failed Payment Recovery\nWhen a Stripe subscription or invoice payment fails, instantly emails the customer a friendly \"update your card\" link and alerts your team on Slack.\n\n### Setup\n1. Add a **Stripe** credential (Stripe Dashboard → Developers → API keys). A restricted key with *Webhook Endpoints: write* and *Invoices: read* is enough.\n2. Fill in **Config** and pick your **SMTP** and **Slack** credentials.\n3. Click **Activate** — n8n registers the webhook in Stripe for you automatically.\n\nFull guide: README.md in this workflow's folder.",
+        "height": 375,
+        "width": 500,
+        "color": 7
+      },
+      "id": "b5aa98a9-d17c-5837-9a87-398c978c5940",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        220
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Stripe: Payment Failed": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Payment Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Payment Details": {
+      "main": [
+        [
+          {
+            "node": "Email Customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Customer": {
+      "main": [
+        [
+          {
+            "node": "Alert Team on Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

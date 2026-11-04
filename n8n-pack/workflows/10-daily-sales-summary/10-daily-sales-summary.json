@@ -1,0 +1,239 @@
+{
+  "name": "10 · Daily Sales Summary Email",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 19,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "28b600a7-1e5f-5ae1-a388-f1771c98f0df",
+      "name": "Every Evening 7pm",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "dddec1eb-52ea-55d4-88ce-b6402210eeb8",
+              "name": "businessName",
+              "value": "Your Business Name",
+              "type": "string"
+            },
+            {
+              "id": "cdcfe826-3fd6-5f04-b648-d6b2a107d358",
+              "name": "fromEmail",
+              "value": "reports@yourbusiness.com",
+              "type": "string"
+            },
+            {
+              "id": "4dfdaa97-6e18-5ddd-8ab8-e24cb14f00e4",
+              "name": "ownerEmail",
+              "value": "you@yourbusiness.com",
+              "type": "string"
+            },
+            {
+              "id": "c5b7571d-96a0-5d9b-9fba-5a5bffa09a97",
+              "name": "sheetId",
+              "value": "PASTE_YOUR_GOOGLE_SHEET_ID",
+              "type": "string"
+            },
+            {
+              "id": "0b8aeb51-5482-53b7-8203-18be5b2f9096",
+              "name": "timezone",
+              "value": "America/New_York",
+              "type": "string"
+            },
+            {
+              "id": "3c2cbd18-f348-59a0-9776-584ea59dbcb8",
+              "name": "currency",
+              "value": "USD",
+              "type": "string"
+            },
+            {
+              "id": "62ea416a-38ec-5023-a997-0a1a5c02a1c8",
+              "name": "locale",
+              "value": "en-US",
+              "type": "string"
+            },
+            {
+              "id": "958cab0c-f753-5424-9b2f-f6828c7b1b14",
+              "name": "skipIfNoSales",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "a66fd883-ad95-5655-ba57-75c48865d771",
+              "name": "brandColor",
+              "value": "#2563eb",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ca7892ba-c9f1-5a9a-82b9-12794670ec2c",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        300
+      ],
+      "notes": "Edit these values for your business.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Config').first().json.sheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sales",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "dcfd33f6-30f0-5a84-99f3-e6499f75abf3",
+      "name": "Get Sales",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        480,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Google Sheets account"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ---- helpers (shared by the workflows in this pack) ----\nconst cfg = $('Config').first().json;\nconst zone = cfg.timezone || 'UTC';\nconst now = DateTime.now().setZone(zone);\nconst today = now.startOf('day');\n\n// Read the first non-empty value among several possible column names.\nconst val = (row, ...keys) => {\n  for (const k of keys) {\n    const v = row[k];\n    if (v !== undefined && v !== null && String(v).trim() !== '') return String(v).trim();\n  }\n  return '';\n};\n\n// Accepts 2026-11-20, 2026-11-20T14:30, 11/20/2026, 20.11.2026, Nov 20, 2026 or a Sheets serial number.\nfunction parseDate(v) {\n  if (v === undefined || v === null || v === '') return null;\n  if (typeof v === 'number') {\n    return DateTime.fromMillis(Math.round((v - 25569) * 86400000), { zone: 'utc' })\n      .setZone(zone, { keepLocalTime: true });\n  }\n  const s = String(v).trim();\n  let d = DateTime.fromISO(s, { zone });\n  if (d.isValid) return d;\n  d = DateTime.fromSQL(s, { zone });\n  if (d.isValid) return d;\n  for (const f of ['M/d/yyyy', 'M/d/yyyy H:mm', 'M/d/yyyy h:mm a', 'M/d/yy', 'd.M.yyyy', 'yyyy/M/d', 'd MMM yyyy', 'MMM d, yyyy', 'MMMM d, yyyy']) {\n    d = DateTime.fromFormat(s, f, { zone });\n    if (d.isValid) return d;\n  }\n  const js = new Date(s);\n  return isNaN(js) ? null : DateTime.fromJSDate(js).setZone(zone);\n}\n\n// Whole days between a date and today (positive = in the past).\nconst daysAgo = (d) => Math.round(today.diff(d.startOf('day'), 'days').days);\n\nconst firstName = (name) => (String(name || '').trim().split(/\\s+/)[0] || 'there');\n\nconst toNumber = (v) => {\n  if (typeof v === 'number') return v;\n  const n = parseFloat(String(v ?? '').replace(/[^0-9.\\-]/g, ''));\n  return isNaN(n) ? 0 : n;\n};\n\nfunction money(amount, currency) {\n  const cur = (currency || cfg.currency || 'USD').toUpperCase();\n  try {\n    return new Intl.NumberFormat(cfg.locale || 'en-US', { style: 'currency', currency: cur }).format(toNumber(amount));\n  } catch (e) {\n    return cur + ' ' + toNumber(amount).toFixed(2);\n  }\n}\n\nconst esc = (s) => String(s ?? '').replace(/[&<>\"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' }[c]));\n\nconst button = (url, label) => url\n  ? `<p style=\"margin:24px 0\"><a href=\"${esc(url)}\" style=\"background:${cfg.brandColor || '#2563eb'};color:#ffffff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block\">${esc(label)}</a></p>`\n  : '';\n\n// Wraps body HTML in a clean, mobile-friendly email layout.\nconst layout = (inner) => `<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:560px;margin:0 auto;padding:24px\">${inner}<p style=\"margin-top:32px;color:#6b7280;font-size:13px\">${esc(cfg.businessName || '')}</p></div>`;\n// ---- end helpers ----\n\nconst sales = $input.all()\n  .map((i) => i.json)\n  .map((r) => ({ d: parseDate(r['Date']), amount: toNumber(r['Amount']), who: val(r, 'Customer Name', 'Customer Email') || 'Customer', order: val(r, 'Order ID') }))\n  .filter((s) => s.d);\n\nconst on = (day) => sales.filter((s) => s.d.hasSame(day, 'day'));\nconst sum = (list) => list.reduce((t, s) => t + s.amount, 0);\nconst pct = (a, b) => (b ? Math.round(((a - b) / b) * 100) : null);\nconst arrow = (p) => (p === null ? '' : p >= 0 ? ` <span style=\"color:#16a34a\">▲ ${p}%</span>` : ` <span style=\"color:#dc2626\">▼ ${Math.abs(p)}%</span>`);\n\nconst todays = on(today);\nconst yesterday = on(today.minus({ days: 1 }));\nconst lastWeek = on(today.minus({ days: 7 }));\nconst mtd = sales.filter((s) => s.d.hasSame(today, 'month') && s.d <= now);\n\nif (!todays.length && cfg.skipIfNoSales) return [];\n\nconst total = sum(todays);\nconst tile = (label, value, extra = '') => `<td style=\"padding:12px;border:1px solid #e5e7eb;border-radius:6px;text-align:center\"><div style=\"font-size:12px;color:#6b7280;text-transform:uppercase\">${label}</div><div style=\"font-size:22px;font-weight:bold\">${value}</div><div style=\"font-size:12px\">${extra}</div></td>`;\nconst rows = todays\n  .sort((a, b) => b.amount - a.amount)\n  .slice(0, 25)\n  .map((s) => `<tr><td style=\"padding:6px;border-bottom:1px solid #f3f4f6\">${s.d.toFormat('HH:mm')}</td><td style=\"padding:6px;border-bottom:1px solid #f3f4f6\">${esc(s.who)}</td><td style=\"padding:6px;border-bottom:1px solid #f3f4f6;text-align:right\">${money(s.amount)}</td></tr>`)\n  .join('');\n\nconst html = layout(`\n  <h2 style=\"margin:0 0 4px\">Sales for ${today.toFormat('cccc d LLLL')}</h2>\n  <p style=\"margin:0 0 16px;color:#6b7280\">Your end-of-day snapshot</p>\n  <table style=\"width:100%;border-collapse:separate;border-spacing:8px\"><tr>\n    ${tile('Revenue', money(total), 'vs yesterday' + arrow(pct(total, sum(yesterday))))}\n    ${tile('Orders', todays.length, 'vs yesterday' + arrow(pct(todays.length, yesterday.length)))}\n    ${tile('Avg order', money(todays.length ? total / todays.length : 0))}\n  </tr></table>\n  <p>Same day last week: <b>${money(sum(lastWeek))}</b> (${lastWeek.length} orders)${arrow(pct(total, sum(lastWeek)))}<br>\n  Month to date: <b>${money(sum(mtd))}</b> from ${mtd.length} orders</p>\n  ${rows ? `<h3>Today's orders</h3><table style=\"width:100%;border-collapse:collapse;font-size:14px\">${rows}</table>` : '<p>No sales recorded today.</p>'}\n`);\nreturn [{ json: { subject: `${cfg.businessName}: ${money(total)} from ${todays.length} order${todays.length === 1 ? '' : 's'} today`, html } }];\n"
+      },
+      "id": "d95fa84b-1a09-568a-9227-b1687bb76f1b",
+      "name": "Build Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('Config').first().json.fromEmail }}",
+        "toEmail": "={{ $('Config').first().json.ownerEmail }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "html",
+        "html": "={{ $json.html }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "3f19e758-3604-5f96-94d8-271a2ac1daf8",
+      "name": "Email Summary",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        960,
+        300
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Daily Sales Summary\nEvery evening, emails you a clean one-glance summary of the day's sales: revenue, orders, average order value and how it compares with yesterday and last week.\n\n### Setup\n1. Make sure you have a **Sales** tab with at least `Date` and `Amount` columns (see `sheet-Sales.csv`). Workflow 09 creates rows automatically.\n2. Fill in **Config** (sheet ID, emails, timezone, currency). Set `skipIfNoSales` to `true` if you don't want an email on zero-sale days.\n3. Pick your **Google Sheets** and **SMTP** credentials, then **Activate**.\n\nFull guide: README.md in this workflow's folder.",
+        "height": 396,
+        "width": 500,
+        "color": 7
+      },
+      "id": "4a685587-509e-5498-a359-d961d0d411eb",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        220
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every Evening 7pm": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Get Sales",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Sales": {
+      "main": [
+        [
+          {
+            "node": "Build Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Summary": {
+      "main": [
+        [
+          {
+            "node": "Email Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

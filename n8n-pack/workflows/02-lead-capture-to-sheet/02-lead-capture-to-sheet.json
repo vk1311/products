@@ -1,0 +1,391 @@
+{
+  "name": "02 · Website Lead Capture → Google Sheet + Slack",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-capture",
+        "options": {},
+        "responseMode": "responseNode"
+      },
+      "id": "65c42411-2b74-55e4-9256-5fca8c51cb08",
+      "name": "Lead Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "d805a891-c0b8-556e-9735-9787fb899ce8"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "5b13aa5c-106f-5de5-9ba5-1070bb1504ab",
+              "name": "businessName",
+              "value": "Your Business Name",
+              "type": "string"
+            },
+            {
+              "id": "cef9c9b0-cea0-5e6d-a52f-673368ebfbae",
+              "name": "sheetId",
+              "value": "PASTE_YOUR_GOOGLE_SHEET_ID",
+              "type": "string"
+            },
+            {
+              "id": "ca4322d6-9bbe-5de9-8fa5-29ccd7fd8589",
+              "name": "slackChannelId",
+              "value": "C0123456789",
+              "type": "string"
+            },
+            {
+              "id": "736aca76-75c2-5599-8e86-f9276e945e62",
+              "name": "timezone",
+              "value": "America/New_York",
+              "type": "string"
+            },
+            {
+              "id": "85265150-70dd-5459-91ee-a5daf9495c2a",
+              "name": "honeypotField",
+              "value": "website_url",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "778fc746-e15a-5ea1-9d4a-f749bfac7844",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        300
+      ],
+      "notes": "Edit these values for your business.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// Accepts JSON or form posts from any website builder (Webflow, WordPress, Wix, Framer, Carrd, plain HTML...).\n// It looks for common field names, so you rarely need to change anything.\nconst cfg = $('Config').first().json;\nreturn $('Lead Webhook').all().map((item, i) => {\n  const b = item.json.body || {};\n  const q = item.json.query || {};\n  const pick = (...keys) => {\n    for (const k of keys) {\n      const v = b[k] ?? q[k];\n      if (v !== undefined && v !== null && String(v).trim() !== '') return String(v).trim();\n    }\n    return '';\n  };\n  let name = pick('name', 'Name', 'full_name', 'fullName', 'your-name');\n  if (!name) name = [pick('first_name', 'firstName', 'fname'), pick('last_name', 'lastName', 'lname')].filter(Boolean).join(' ');\n  const email = pick('email', 'Email', 'email_address', 'your-email').toLowerCase();\n  const honeypot = pick(cfg.honeypotField || 'website_url'); // hidden field humans never fill in = spam bot\n  return {\n    json: {\n      name: name || 'Unknown',\n      email,\n      phone: pick('phone', 'Phone', 'phone_number', 'tel', 'your-phone'),\n      message: pick('message', 'Message', 'comments', 'details', 'your-message'),\n      source: pick('source', 'utm_source', 'Source') || item.json.headers?.referer || 'Website',\n      campaign: pick('utm_campaign', 'campaign'),\n      receivedAt: DateTime.now().setZone(cfg.timezone || 'UTC').toFormat('yyyy-MM-dd HH:mm'),\n      valid: /^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/.test(email) && !honeypot,\n    },\n    pairedItem: { item: i },\n  };\n});\n"
+      },
+      "id": "0ec99498-eaff-5c8a-b856-b3c7300b5c86",
+      "name": "Clean Up Lead",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e906a8aa-43bb-5e5a-8a1f-a9b440176833",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "3026b614-8a6e-52cb-a4cb-4f42bd327412",
+      "name": "Valid Lead?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        720,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Config').first().json.sheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Leads",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $json.receivedAt }}",
+            "Name": "={{ $json.name }}",
+            "Email": "={{ $json.email }}",
+            "Phone": "={{ $json.phone }}",
+            "Message": "={{ $json.message }}",
+            "Source": "={{ $json.source }}",
+            "Campaign": "={{ $json.campaign }}"
+          },
+          "matchingColumns": [
+            "Email"
+          ],
+          "schema": [
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Message",
+              "displayName": "Message",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Source",
+              "displayName": "Source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Campaign",
+              "displayName": "Campaign",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "38caef7a-1ed0-5f4f-ac91-22cfe4f44709",
+      "name": "Save Lead to Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        960,
+        200
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "={{ $('Config').first().json.slackChannelId }}",
+          "mode": "id"
+        },
+        "text": "=:wave: *New lead:* {{ $('Clean Up Lead').item.json.name }} ({{ $('Clean Up Lead').item.json.email }}{{ $('Clean Up Lead').item.json.phone ? ', ' + $('Clean Up Lead').item.json.phone : '' }})\n*Source:* {{ $('Clean Up Lead').item.json.source }}\n>{{ $('Clean Up Lead').item.json.message || '(no message)' }}",
+        "otherOptions": {
+          "includeLinkToWorkflow": false
+        }
+      },
+      "id": "f5efc261-9399-577c-bdd1-2a7e8ebcb64a",
+      "name": "Notify Team on Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        200
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"ok\": true,\n  \"message\": \"Thanks! We'll be in touch soon.\"\n}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "a5849419-ef24-5c82-9b2f-282d1f0298f0",
+      "name": "Respond: Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1440,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"ok\": false,\n  \"error\": \"Please enter a valid email address.\"\n}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "882a0750-718a-544e-9c4c-a34904ff80f6",
+      "name": "Respond: Invalid",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Lead Capture → Google Sheet + Slack\nCatches leads from any website form, filters out junk and bots, saves them to a Google Sheet (no duplicates) and pings your team on Slack.\n\n### Setup\n1. Create a Google Sheet with a tab named **Leads** and the header row from `sheet-Leads.csv` (or import that file).\n2. Copy the sheet ID from its URL (`docs.google.com/spreadsheets/d/`**`THIS_PART`**`/edit`) into **Config → sheetId**.\n3. In **Config**, set your Slack channel ID (right-click channel → *View channel details* → bottom of the window) and timezone.\n4. Pick your **Google Sheets** credential on *Save Lead to Sheet* and your **Slack** credential on *Notify Team on Slack*. Invite the Slack bot to the channel (`/invite @YourBot`).\n5. Activate the workflow, then copy the **Production URL** from the *Lead Webhook* node.\n6. Point your website form at that URL (POST). See the HTML snippet below if your builder doesn't have a \"webhook\" option.\n\nFull guide: README.md in this workflow's folder.",
+        "height": 606,
+        "width": 500,
+        "color": 7
+      },
+      "id": "9e104b5d-436e-5407-afb6-c1faf6fdc0fb",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        120
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Lead Webhook": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Clean Up Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean Up Lead": {
+      "main": [
+        [
+          {
+            "node": "Valid Lead?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid Lead?": {
+      "main": [
+        [
+          {
+            "node": "Save Lead to Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond: Invalid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Lead to Sheet": {
+      "main": [
+        [
+          {
+            "node": "Notify Team on Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Team on Slack": {
+      "main": [
+        [
+          {
+            "node": "Respond: Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

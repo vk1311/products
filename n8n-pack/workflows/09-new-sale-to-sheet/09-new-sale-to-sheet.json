@@ -1,0 +1,326 @@
+{
+  "name": "09 · Stripe New Sale → Google Sheet + Telegram",
+  "nodes": [
+    {
+      "parameters": {
+        "events": [
+          "checkout.session.completed"
+        ]
+      },
+      "id": "2ba0c8c9-2cc5-5f94-ac45-6d523e5aa7ef",
+      "name": "Stripe: Checkout Completed",
+      "type": "n8n-nodes-base.stripeTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "c2eca1e2-226e-5ef0-8a8f-7b2dfadfd9ff",
+      "credentials": {
+        "stripeApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Stripe account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c1513c39-d21d-5105-ba1f-597a0e62b316",
+              "name": "sheetId",
+              "value": "PASTE_YOUR_GOOGLE_SHEET_ID",
+              "type": "string"
+            },
+            {
+              "id": "9484cefe-899a-5c14-b117-de843d549e73",
+              "name": "telegramChatId",
+              "value": "123456789",
+              "type": "string"
+            },
+            {
+              "id": "34c64aaf-37d1-537b-9b29-135441f15f12",
+              "name": "timezone",
+              "value": "America/New_York",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8644ec5a-dcaa-598a-a82a-df81a9a3d215",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        300
+      ],
+      "notes": "Edit these values for your business.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f2d9b6f8-3864-522d-8eab-84654aef2cfc",
+              "name": "date",
+              "value": "={{ DateTime.fromSeconds($('Stripe: Checkout Completed').item.json.data.object.created).setZone($('Config').first().json.timezone).toFormat('yyyy-MM-dd HH:mm') }}",
+              "type": "string"
+            },
+            {
+              "id": "eb4c2f21-11a5-5605-92bb-b575bff2f67a",
+              "name": "orderId",
+              "value": "={{ $('Stripe: Checkout Completed').item.json.data.object.id }}",
+              "type": "string"
+            },
+            {
+              "id": "e8126769-e5a3-582a-ac52-edf1e759fd40",
+              "name": "name",
+              "value": "={{ $('Stripe: Checkout Completed').item.json.data.object.customer_details?.name || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "1d5e4505-46de-5c5d-8353-f89895b7c611",
+              "name": "email",
+              "value": "={{ $('Stripe: Checkout Completed').item.json.data.object.customer_details?.email || $('Stripe: Checkout Completed').item.json.data.object.customer_email || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "7e7f4cbf-76a9-566c-9e8f-c2a0da85c551",
+              "name": "amount",
+              "value": "={{ ['bif','clp','djf','gnf','jpy','kmf','krw','mga','pyg','rwf','ugx','vnd','vuv','xaf','xof','xpf'].includes($('Stripe: Checkout Completed').item.json.data.object.currency) ? $('Stripe: Checkout Completed').item.json.data.object.amount_total : $('Stripe: Checkout Completed').item.json.data.object.amount_total / 100 }}",
+              "type": "number"
+            },
+            {
+              "id": "f9e2aaa8-b4d2-5f18-9bb4-32e4234afbc3",
+              "name": "currency",
+              "value": "={{ ($('Stripe: Checkout Completed').item.json.data.object.currency || '').toUpperCase() }}",
+              "type": "string"
+            },
+            {
+              "id": "711c99da-6ba9-5357-813e-ad95387085c9",
+              "name": "paymentStatus",
+              "value": "={{ $('Stripe: Checkout Completed').item.json.data.object.payment_status }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3dc8cdba-b874-5dd8-a070-c7c2f5c2ebb6",
+      "name": "Sale Details",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Config').first().json.sheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Sales",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $json.date }}",
+            "Order ID": "={{ $json.orderId }}",
+            "Customer Name": "={{ $json.name }}",
+            "Customer Email": "={{ $json.email }}",
+            "Amount": "={{ $json.amount }}",
+            "Currency": "={{ $json.currency }}",
+            "Source": "Stripe"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Order ID",
+              "displayName": "Order ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Customer Name",
+              "displayName": "Customer Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Customer Email",
+              "displayName": "Customer Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Amount",
+              "displayName": "Amount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Currency",
+              "displayName": "Currency",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Source",
+              "displayName": "Source",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "646fa938-70af-58af-ba5b-1590fe91e7e4",
+      "name": "Add Sale to Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        720,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Config').first().json.telegramChatId }}",
+        "text": "=💰 <b>New sale!</b> {{ $('Sale Details').item.json.amount.toFixed(2) }} {{ $('Sale Details').item.json.currency }}\n{{ ($('Sale Details').item.json.name || 'A customer').replace(/[<>&]/g, '') }} ({{ $('Sale Details').item.json.email.replace(/[<>&]/g, '') }})",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "8d09d09a-3a60-53ce-8f21-d4953c5e1d12",
+      "name": "Notify on Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        960,
+        300
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Stripe New Sale → Sheet + Telegram\nLogs every Stripe sale to a Google Sheet and sends a 💰 notification to your phone via Telegram.\n\n### Setup\n1. Add a **Stripe** credential and select it on the trigger.\n2. Create a sheet tab named **Sales** with the headers in `sheet-Sales.csv`; paste the sheet ID into **Config**.\n3. Telegram: message @BotFather → `/newbot` → copy the token into a **Telegram** credential. Then message your bot, open `https://api.telegram.org/bot<TOKEN>/getUpdates` and copy your `chat.id` into **Config → telegramChatId**.\n4. Pick your **Google Sheets** and **Telegram** credentials, then **Activate** (n8n registers the Stripe webhook automatically).\n\nFull guide: README.md in this workflow's folder.",
+        "height": 438,
+        "width": 500,
+        "color": 7
+      },
+      "id": "81f8d5bc-c99a-5258-bc25-c2f856546fc7",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        220
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Stripe: Checkout Completed": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Sale Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sale Details": {
+      "main": [
+        [
+          {
+            "node": "Add Sale to Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Sale to Sheet": {
+      "main": [
+        [
+          {
+            "node": "Notify on Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}
