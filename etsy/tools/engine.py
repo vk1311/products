@@ -250,6 +250,11 @@ def consent(text):
     return {"t": "consent", "text": text}
 
 
+def elist(items, blank=0, numbered=True, rh=19):
+    """Numbered lines pre-filled with editable text (rules, instructions)."""
+    return {"t": "elist", "items": list(items) + [""] * blank, "numbered": numbered, "rh": rh}
+
+
 def area(label, h=60):
     return {"t": "area", "label": label, "h": h}
 
@@ -329,6 +334,8 @@ def height(el):
         return _groups_layout(el)[0] + GAP
     if t == "area":
         return el["h"] + 14 + GAP
+    if t == "elist":
+        return len(el["items"]) * el["rh"] + GAP
     if t == "consent":
         return _para_h(el["text"], "p", WIDTH - 18) + 8
     if t == "para":
@@ -549,6 +556,30 @@ def _draw_area(d, el):
     c.rect(MARGIN_X, d.y - 13 - el["h"], WIDTH, el["h"], stroke=1, fill=0)
     d.text(el["label"], MARGIN_X + 3, d.y - 12 - el["h"], WIDTH - 6, h=el["h"] - 2, multiline=True)
     d.y -= el["h"] + 14 + GAP
+
+
+def _draw_elist(d, el):
+    c = d.c
+    y = d.y
+    rh = el["rh"]
+    base = 10 if rh >= 24 else 9
+    for i, txt in enumerate(el["items"], 1):
+        yb = y - rh
+        x = MARGIN_X
+        if el["numbered"]:
+            c.setFont(BOLD, 9)
+            c.setFillColor(ACCENT)
+            c.drawString(x, yb + 5, f"{i}.")
+            x += 18
+        c.setStrokeColor(LINE)
+        c.setLineWidth(0.5)
+        c.line(x, yb + 2, MARGIN_X + WIDTH, yb + 2)
+        size = base
+        while stringWidth(txt, FONT, size) > MARGIN_X + WIDTH - x - 6 and size > 7:
+            size -= 0.25
+        d.text(f"line {i}", x, yb + 3, MARGIN_X + WIDTH - x, h=min(rh - 4, 16), size=size, value=txt)
+        y = yb
+    d.y = y - GAP
 
 
 def _draw_consent(d, el):

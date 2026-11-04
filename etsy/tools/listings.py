@@ -18,7 +18,7 @@ CAT_TAGS = {
     "hr": ["hr form", "employee form", "human resources", "payroll form"],
     "safety": ["safety form", "workplace safety", "ohs form", "incident form"],
     "cleaning": ["cleaning checklist", "cleaning business", "janitorial form", "cleaning service"],
-    "rental": ["rental property", "landlord form", "vacation rental", "host printable"],
+    "rental": ["rental property", "landlord form", "property manager", "rental printable"],
     "food": ["restaurant form", "food safety", "kitchen form", "cafe printable"],
 }
 
@@ -66,8 +66,11 @@ def _join(items):
 
 def _contents(f):
     out = []
+    named = sum(1 for el in f["body"] if el["t"] in ("section", "pair"))
     for el in f["body"]:
         t = el["t"]
+        if t == "table" and named >= 2 and el.get("rows") != "fill":
+            continue
         if t == "section":
             out.append(el["title"].title() if el["title"].isupper() else el["title"])
         elif t == "pair":
@@ -86,6 +89,9 @@ def _contents(f):
             out.append("signature and date lines")
         elif t == "rules":
             out.append(f"{len(el['items'])} pre-written points")
+        elif t == "elist":
+            n = sum(1 for x in el["items"] if x)
+            out.append(f"{n} pre-written lines you can edit or replace" if n else "blank lines")
         elif t == "yesno":
             out.append(f"{len(el['qs'])} yes/no questions")
         elif t == "cards":
@@ -134,7 +140,7 @@ def listing(f, fname):
         "",
         "PLEASE NOTE",
         "- This is a digital download. No physical item will be shipped.",
-        "- Totals are typed in, not auto-calculated.",
+    ] + (["- Totals are typed in, not auto-calculated."] if any(e["t"] == "totals" for e in f["body"]) else []) + [
         "- This template is not legal, tax or accounting advice and is not an official government form. Rules differ by province and change over time, so confirm what applies to you.",
         "- For use in your own business. Please do not resell or share the file.",
     ]

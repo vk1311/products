@@ -1,6 +1,6 @@
 """Shared building blocks for Canadian business forms."""
 
-from engine import (area, consent, checklist, fields, groups, matrix, options, pair, para,
+from engine import (area, consent, elist, checklist, fields, groups, matrix, options, pair, para,
                     rating, rules, section, signatures, spacer, table, totals, yesno,
                     cards, pagebreak)
 
