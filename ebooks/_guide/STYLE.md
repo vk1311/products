@@ -51,7 +51,8 @@ vary by province and say where to check).
 
 ## Length and structure
 
-- **Target 6,000–7,500 words of body text.** The PDF must land at 15–25 pages (Letter size).
+- **Target 6,000–7,000 words of body text.** The PDF must land at 15–25 pages (Letter size);
+  in practice about 6,000–6,800 words fills 23–24 pages with this layout.
   Cover, notice page and contents use 3 pages. Each `#` chapter starts on a new page.
 - Front matter (YAML) at the top of `book.md`:
 
