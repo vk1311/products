@@ -33,7 +33,7 @@ for book in "${BOOKS[@]}"; do
   pdf="$OUT/$book.pdf"
 
   pandoc "$src" \
-    --from markdown+task_lists+fenced_divs+pipe_tables+smart \
+    --from markdown+task_lists+fenced_divs+pipe_tables+smart-implicit_header_references \
     --to html5 \
     --standalone \
     --template "$TOOLS/template.html" \
