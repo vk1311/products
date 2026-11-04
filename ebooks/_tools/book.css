@@ -15,7 +15,7 @@
 
 @page {
   size: Letter;
-  margin: 0.9in 0.95in 0.9in 0.95in;
+  margin: 0.75in 0.85in 0.75in 0.85in;
   @bottom-center {
     content: counter(page);
     font-family: "Inter", "Helvetica Neue", Arial, sans-serif;
@@ -34,11 +34,11 @@
   @top-right { content: none; }
 }
 
-html { font-size: 11pt; }
+html { font-size: 10.5pt; }
 body {
   font-family: "Inter", "Helvetica Neue", Arial, sans-serif;
   color: var(--ink);
-  line-height: 1.55;
+  line-height: 1.5;
   margin: 0;
   font-feature-settings: "kern", "liga";
   hyphens: auto;
