@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en-CA">
+<head>
+<meta charset="utf-8">
+<title>$title$</title>
+$for(css)$
+<link rel="stylesheet" href="$css$">
+$endfor$
+<style>@page { @top-right { content: "$pagetitle$"; } } @page :first { @top-right { content: none; } }</style>
+</head>
+<body>
+
+<section class="cover">
+  <div class="cover-series">$if(series)$$series$$else$Small Business Basics · Canada$endif$</div>
+  <h1 class="cover-title">$title$</h1>
+$if(subtitle)$
+  <p class="cover-subtitle">$subtitle$</p>
+$endif$
+  <div class="cover-rule"></div>
+  <p class="cover-audience">$if(audience)$$audience$$else$A plain-language guide for Canadian small-business owners$endif$</p>
+  <div class="cover-foot">
+$if(author)$
+    <span>$author$</span>
+$endif$
+    <span>$if(edition)$$edition$$endif$</span>
+  </div>
+</section>
+
+<section class="copyright">
+  <p><strong>$title$</strong>$if(subtitle)$ — $subtitle$$endif$</p>
+  <p>$if(edition)$$edition$. $endif$© $if(year)$$year$$else$2026$endif$$if(author)$ $author$$endif$. All rights reserved. You may print this guide and copy the worksheets and templates for use in your own business. Please do not resell or redistribute the guide itself.</p>
+  <p><strong>Important.</strong> This guide is general information for Canadian small-business owners. It is not legal, tax, accounting, or financial advice, and it does not create a professional relationship of any kind. Rules, rates, forms, and software features change. Before you act, check the official source named in the guide and, where the stakes are real, talk to a qualified professional who knows your situation.</p>
+$if(notice)$
+  <p>$notice$</p>
+$endif$
+  <p>No result is promised. How useful any idea in this guide turns out to be depends on your business, your customers, your market, and how you apply it.</p>
+  <p>Product and company names mentioned are trademarks of their respective owners. They are used for identification only. This guide is independent and is not sponsored, endorsed, or affiliated with any company, government body, or software product it mentions.</p>
+</section>
+
+$if(toc)$
+<nav class="toc">
+  <h2 class="toc-title">Contents</h2>
+$table-of-contents$
+</nav>
+$endif$
+
+<main>
+$body$
+</main>
+
+</body>
+</html>
