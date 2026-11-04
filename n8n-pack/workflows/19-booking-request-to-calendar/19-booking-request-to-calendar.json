@@ -1,0 +1,443 @@
+{
+  "name": "19 · Booking Form → Google Calendar (with availability check)",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Book an appointment",
+        "formDescription": "Pick a day and time — you'll get a confirmation by email straight away.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Name",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Email",
+              "fieldType": "email",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Phone",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Service",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Consultation"
+                  },
+                  {
+                    "option": "Standard appointment"
+                  },
+                  {
+                    "option": "Follow-up"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Date",
+              "fieldType": "date",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Time",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "9:00 AM"
+                  },
+                  {
+                    "option": "10:00 AM"
+                  },
+                  {
+                    "option": "11:00 AM"
+                  },
+                  {
+                    "option": "12:00 PM"
+                  },
+                  {
+                    "option": "1:00 PM"
+                  },
+                  {
+                    "option": "2:00 PM"
+                  },
+                  {
+                    "option": "3:00 PM"
+                  },
+                  {
+                    "option": "4:00 PM"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Anything we should know?",
+              "fieldType": "textarea"
+            }
+          ]
+        },
+        "options": {
+          "appendAttribution": false,
+          "respondWithOptions": {
+            "values": {
+              "respondWith": "text",
+              "formSubmittedText": "Thanks! Check your email — we've sent your confirmation (or alternative times)."
+            }
+          }
+        }
+      },
+      "id": "a55ac3b8-9400-5566-8f6e-ad46afbb163f",
+      "name": "Booking Request Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "c509bbbd-06e4-5f5b-8648-745e414fcf11"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f1462b62-a204-578c-bb19-3da39d096c1c",
+              "name": "businessName",
+              "value": "Your Business Name",
+              "type": "string"
+            },
+            {
+              "id": "e2bce6ca-ae75-5dc8-9096-741c4c87be59",
+              "name": "fromEmail",
+              "value": "bookings@yourbusiness.com",
+              "type": "string"
+            },
+            {
+              "id": "a88f2667-d264-5246-9b7f-d0b0f0355204",
+              "name": "ownerEmail",
+              "value": "you@yourbusiness.com",
+              "type": "string"
+            },
+            {
+              "id": "012298c0-c056-51fc-b030-1ebecc8d3605",
+              "name": "calendarId",
+              "value": "primary",
+              "type": "string"
+            },
+            {
+              "id": "6457db27-542d-5812-a4a3-1807f90553d7",
+              "name": "durationMinutes",
+              "value": 60,
+              "type": "number"
+            },
+            {
+              "id": "d3c5f524-f0eb-5447-9bcb-d9756d022bbe",
+              "name": "timezone",
+              "value": "America/New_York",
+              "type": "string"
+            },
+            {
+              "id": "1252a24e-2771-57f2-bca8-48295ee19095",
+              "name": "businessAddress",
+              "value": "123 Main St, Springfield",
+              "type": "string"
+            },
+            {
+              "id": "756931ef-251d-581c-8941-219a38661a4a",
+              "name": "bookingFormUrl",
+              "value": "PASTE_THIS_FORM'S_PRODUCTION_URL",
+              "type": "string"
+            },
+            {
+              "id": "748c9fac-4b6e-50de-b041-264d6a22bf66",
+              "name": "brandColor",
+              "value": "#2563eb",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "46ef437a-b585-5380-9e0c-125f79c7ebc3",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        300
+      ],
+      "notes": "Edit these values for your business.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ---- helpers (shared by the workflows in this pack) ----\nconst cfg = $('Config').first().json;\nconst zone = cfg.timezone || 'UTC';\nconst now = DateTime.now().setZone(zone);\nconst today = now.startOf('day');\n\n// Read the first non-empty value among several possible column names.\nconst val = (row, ...keys) => {\n  for (const k of keys) {\n    const v = row[k];\n    if (v !== undefined && v !== null && String(v).trim() !== '') return String(v).trim();\n  }\n  return '';\n};\n\n// Accepts 2026-11-20, 2026-11-20T14:30, 11/20/2026, 20.11.2026, Nov 20, 2026 or a Sheets serial number.\nfunction parseDate(v) {\n  if (v === undefined || v === null || v === '') return null;\n  if (typeof v === 'number') {\n    return DateTime.fromMillis(Math.round((v - 25569) * 86400000), { zone: 'utc' })\n      .setZone(zone, { keepLocalTime: true });\n  }\n  const s = String(v).trim();\n  let d = DateTime.fromISO(s, { zone });\n  if (d.isValid) return d;\n  d = DateTime.fromSQL(s, { zone });\n  if (d.isValid) return d;\n  for (const f of ['M/d/yyyy', 'M/d/yyyy H:mm', 'M/d/yyyy h:mm a', 'M/d/yy', 'd.M.yyyy', 'yyyy/M/d', 'd MMM yyyy', 'MMM d, yyyy', 'MMMM d, yyyy']) {\n    d = DateTime.fromFormat(s, f, { zone });\n    if (d.isValid) return d;\n  }\n  const js = new Date(s);\n  return isNaN(js) ? null : DateTime.fromJSDate(js).setZone(zone);\n}\n\n// Whole days between a date and today (positive = in the past).\nconst daysAgo = (d) => Math.round(today.diff(d.startOf('day'), 'days').days);\n\nconst firstName = (name) => (String(name || '').trim().split(/\\s+/)[0] || 'there');\n\nconst toNumber = (v) => {\n  if (typeof v === 'number') return v;\n  const n = parseFloat(String(v ?? '').replace(/[^0-9.\\-]/g, ''));\n  return isNaN(n) ? 0 : n;\n};\n\nfunction money(amount, currency) {\n  const cur = (currency || cfg.currency || 'USD').toUpperCase();\n  try {\n    return new Intl.NumberFormat(cfg.locale || 'en-US', { style: 'currency', currency: cur }).format(toNumber(amount));\n  } catch (e) {\n    return cur + ' ' + toNumber(amount).toFixed(2);\n  }\n}\n\nconst esc = (s) => String(s ?? '').replace(/[&<>\"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' }[c]));\n\nconst button = (url, label) => url\n  ? `<p style=\"margin:24px 0\"><a href=\"${esc(url)}\" style=\"background:${cfg.brandColor || '#2563eb'};color:#ffffff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block\">${esc(label)}</a></p>`\n  : '';\n\n// Wraps body HTML in a clean, mobile-friendly email layout.\nconst layout = (inner) => `<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:560px;margin:0 auto;padding:24px\">${inner}<p style=\"margin-top:32px;color:#6b7280;font-size:13px\">${esc(cfg.businessName || '')}</p></div>`;\n// ---- end helpers ----\n\nconst f = $('Booking Request Form').first().json;\nconst m = String(f['Time'] || '').match(/(\\d{1,2}):(\\d{2})\\s*(AM|PM)?/i);\nlet hour = m ? Number(m[1]) : 9;\nconst minute = m ? Number(m[2]) : 0;\nif (m && m[3]) { const pm = m[3].toUpperCase() === 'PM'; if (pm && hour < 12) hour += 12; if (!pm && hour === 12) hour = 0; }\n\nconst day = DateTime.fromISO(String(f['Date']).slice(0, 10), { zone });\nconst start = day.set({ hour, minute, second: 0, millisecond: 0 });\nconst end = start.plus({ minutes: Number(cfg.durationMinutes || 60) });\nconst valid = day.isValid && start > now.plus({ hours: 2 });     // needs at least 2 hours' notice\n\nreturn [{\n  json: {\n    name: f['Name'], firstName: firstName(f['Name']), email: f['Email'], phone: f['Phone'],\n    service: f['Service'], notes: f['Anything we should know?'] || '',\n    valid,\n    when: valid ? start.toFormat(\"cccc d LLLL yyyy 'at' h:mm a\") : String(f['Date']) + ' ' + f['Time'],\n    freeBusy: { timeMin: (valid ? start : now).toISO(), timeMax: (valid ? end : now.plus({ minutes: 1 })).toISO(), timeZone: zone, items: [{ id: cfg.calendarId || 'primary' }] },\n    event: {\n      summary: `${f['Service']} – ${f['Name']}`,\n      description: `Phone: ${f['Phone']}\\nEmail: ${f['Email']}\\n\\n${f['Anything we should know?'] || ''}`.trim(),\n      start: { dateTime: start.toISO(), timeZone: zone },\n      end: { dateTime: end.toISO(), timeZone: zone },\n      attendees: [{ email: f['Email'], displayName: f['Name'] }],\n      location: cfg.businessAddress || '',\n      reminders: { useDefault: true },\n    },\n  },\n}];\n"
+      },
+      "id": "972a91b7-51c3-5322-99d8-6e89633a40b0",
+      "name": "Build Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/calendar/v3/freeBusy",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.freeBusy) }}",
+        "options": {}
+      },
+      "id": "38e21a0b-ca8b-58e4-aa35-534920bcb9bd",
+      "name": "Check Calendar Availability",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        300
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ff36d66c-7371-5e79-b9af-aef34baced1e",
+              "leftValue": "={{ $('Build Event').item.json.valid && (Object.values($json.calendars || {})[0]?.busy || ['x']).length === 0 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "ae4d1c3a-4909-5a06-a800-15a6679b1c7f",
+      "name": "Slot Free?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://www.googleapis.com/calendar/v3/calendars/{{ encodeURIComponent($('Config').first().json.calendarId) }}/events",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleCalendarOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "sendUpdates",
+              "value": "all"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Build Event').item.json.event) }}",
+        "options": {}
+      },
+      "id": "0f2f17eb-955d-58d7-89a8-5736eba411a9",
+      "name": "Create Calendar Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        200
+      ],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('Config').first().json.fromEmail }}",
+        "toEmail": "={{ $('Build Event').item.json.email }}",
+        "subject": "=Confirmed: {{ $('Build Event').item.json.service }} on {{ $('Build Event').item.json.when }}",
+        "emailFormat": "html",
+        "html": "=<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:560px;margin:0 auto;padding:24px\"><p>Hi {{ $('Build Event').item.json.firstName }},</p><p>You're booked in! ✅</p><p><b>{{ $('Build Event').item.json.service }}</b><br>{{ $('Build Event').item.json.when }}<br>📍 {{ $('Config').first().json.businessAddress }}</p><p>A calendar invite is on its way too. Need to change anything? Just reply to this email.</p><p>See you then!</p><p style=\"margin-top:32px;color:#6b7280;font-size:13px\">{{ $('Config').first().json.businessName }}</p></div>",
+        "options": {
+          "appendAttribution": false,
+          "replyTo": "={{ $('Config').first().json.ownerEmail }}",
+          "bccEmail": "={{ $('Config').first().json.ownerEmail }}"
+        }
+      },
+      "id": "7cd166d4-7bf7-5651-b1b0-75de700239e0",
+      "name": "Email Confirmation",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1440,
+        200
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('Config').first().json.fromEmail }}",
+        "toEmail": "={{ $('Build Event').item.json.email }}",
+        "subject": "=That time isn't available — please pick another",
+        "emailFormat": "html",
+        "html": "=<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:560px;margin:0 auto;padding:24px\"><p>Hi {{ $('Build Event').item.json.firstName }},</p><p>Sorry — <b>{{ $('Build Event').item.json.when }}</b> isn't available (it's either already booked or too soon for us to prepare).</p><p>Please choose another time and we'll confirm it straight away:</p><p style=\"margin:24px 0\"><a href=\"{{ $('Config').first().json.bookingFormUrl }}\" style=\"background:{{ $('Config').first().json.brandColor }};color:#ffffff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block\">Choose another time</a></p><p>Or just reply with a few times that suit you.</p><p style=\"margin-top:32px;color:#6b7280;font-size:13px\">{{ $('Config').first().json.businessName }}</p></div>",
+        "options": {
+          "appendAttribution": false,
+          "replyTo": "={{ $('Config').first().json.ownerEmail }}"
+        }
+      },
+      "id": "b9046ae8-a331-5fad-bfe9-31ade896d102",
+      "name": "Email: Pick Another Time",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1200,
+        420
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Booking Form → Google Calendar\nA simple booking form that checks your Google Calendar, books the slot if you're free (with a calendar invite to the customer) or politely asks them to pick another time.\n\n### Setup\n1. Add a **Google Calendar OAuth2** credential in n8n and select it on *Check Calendar Availability* and *Create Calendar Event*.\n2. In **Config**, set your timezone, appointment length (`durationMinutes`), address and `calendarId` (`primary` = your main calendar; for another calendar use its ID from Google Calendar → Settings → *Integrate calendar*).\n3. Edit the form's *Service* and *Time* options to match your offering and opening hours.\n4. Pick your **SMTP** credential on both email nodes.\n5. Activate, copy the form's **Production URL**, paste it into **Config → bookingFormUrl**, save, and share the link on your website.\n\nFull guide: README.md in this workflow's folder.",
+        "height": 501,
+        "width": 500,
+        "color": 7
+      },
+      "id": "c2bf76cd-0d21-55b8-be7d-4ced41a040f4",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        120
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Booking Request Form": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Build Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Event": {
+      "main": [
+        [
+          {
+            "node": "Check Calendar Availability",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Calendar Availability": {
+      "main": [
+        [
+          {
+            "node": "Slot Free?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slot Free?": {
+      "main": [
+        [
+          {
+            "node": "Create Calendar Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Email: Pick Another Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Calendar Event": {
+      "main": [
+        [
+          {
+            "node": "Email Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

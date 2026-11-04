@@ -1,0 +1,2 @@
+Client ID,Client Name,Contact Name,Client Email,Monthly Fee,Currency,Description,Active,Payment Link,Last Invoiced
+C001,Acme Ltd,Jordan Fox,accounts@acme.example,1200,USD,Monthly marketing retainer,Yes,https://buy.stripe.com/test_123,

@@ -1,0 +1,2 @@
+Date,Order ID,Customer Name,Customer Email,Amount,Currency,Source
+2026-11-04 13:05,cs_test_a1b2c3,Jane Smith,jane@example.com,89,USD,Stripe

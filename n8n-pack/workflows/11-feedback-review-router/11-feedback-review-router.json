@@ -1,0 +1,600 @@
+{
+  "name": "11 · Customer Feedback Router (happy → Google review, unhappy → you)",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "How did we do?",
+        "formDescription": "Two quick questions — it takes 20 seconds.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Name",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Email",
+              "fieldType": "email",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "How likely are you to recommend us? (0-10)",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "10"
+                  },
+                  {
+                    "option": "9"
+                  },
+                  {
+                    "option": "8"
+                  },
+                  {
+                    "option": "7"
+                  },
+                  {
+                    "option": "6"
+                  },
+                  {
+                    "option": "5"
+                  },
+                  {
+                    "option": "4"
+                  },
+                  {
+                    "option": "3"
+                  },
+                  {
+                    "option": "2"
+                  },
+                  {
+                    "option": "1"
+                  },
+                  {
+                    "option": "0"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "What's the main reason for your score?",
+              "fieldType": "textarea"
+            }
+          ]
+        },
+        "options": {
+          "appendAttribution": false,
+          "respondWithOptions": {
+            "values": {
+              "respondWith": "text",
+              "formSubmittedText": "Thank you — we really appreciate your feedback!"
+            }
+          }
+        }
+      },
+      "id": "961b0658-d895-59a7-a0a8-69034395146b",
+      "name": "Feedback Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "494f8c04-fcfd-5e42-9665-49de6ed068d2"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3772057b-7496-5f78-bdc6-c6cb36b397bb",
+              "name": "businessName",
+              "value": "Your Business Name",
+              "type": "string"
+            },
+            {
+              "id": "cd61fe2e-31f7-5c73-bd1a-8cf90d7455eb",
+              "name": "fromEmail",
+              "value": "hello@yourbusiness.com",
+              "type": "string"
+            },
+            {
+              "id": "c84a7a0b-400c-5185-afda-8bb6d17f8e52",
+              "name": "ownerEmail",
+              "value": "you@yourbusiness.com",
+              "type": "string"
+            },
+            {
+              "id": "d0b4ba45-7622-58fe-80ca-a676b02eed7f",
+              "name": "sheetId",
+              "value": "PASTE_YOUR_GOOGLE_SHEET_ID",
+              "type": "string"
+            },
+            {
+              "id": "371c0a1d-abfe-5ce2-b172-7c5fa0947fbe",
+              "name": "reviewLink",
+              "value": "https://g.page/r/YOUR_PLACE_ID/review",
+              "type": "string"
+            },
+            {
+              "id": "3cfab0c8-53b8-58df-bba7-107739fc5093",
+              "name": "timezone",
+              "value": "America/New_York",
+              "type": "string"
+            },
+            {
+              "id": "54a9a8ad-719c-5ebb-86e1-d3ada3fe3c5f",
+              "name": "brandColor",
+              "value": "#2563eb",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c48bff7d-ad15-570d-9973-b94c4d3144dd",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        300
+      ],
+      "notes": "Edit these values for your business.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2b343a51-4f9e-5ff1-a1cd-8e50eb840dea",
+              "name": "date",
+              "value": "={{ $now.setZone($('Config').first().json.timezone).toFormat('yyyy-MM-dd HH:mm') }}",
+              "type": "string"
+            },
+            {
+              "id": "f4f33820-bd2b-5f93-9c83-e72bbc2d285c",
+              "name": "name",
+              "value": "={{ $('Feedback Form').item.json.Name }}",
+              "type": "string"
+            },
+            {
+              "id": "e0693773-b8f0-5c96-9a67-2bb4888c2802",
+              "name": "firstName",
+              "value": "={{ $('Feedback Form').item.json.Name.trim().split(' ')[0] }}",
+              "type": "string"
+            },
+            {
+              "id": "23e3fb2d-9399-552b-94ac-89b334e9654b",
+              "name": "email",
+              "value": "={{ $('Feedback Form').item.json.Email }}",
+              "type": "string"
+            },
+            {
+              "id": "3da3e407-3da7-525f-ba26-f5c44aca27f1",
+              "name": "score",
+              "value": "={{ Number($('Feedback Form').item.json['How likely are you to recommend us? (0-10)']) }}",
+              "type": "number"
+            },
+            {
+              "id": "cadf56b4-8595-5c16-9d3b-f5eb2b45fed1",
+              "name": "comment",
+              "value": "={{ $('Feedback Form').item.json[\"What's the main reason for your score?\"] || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "c2aa7e8a-220e-5879-a623-058f5b0921fc",
+              "name": "category",
+              "value": "={{ Number($('Feedback Form').item.json['How likely are you to recommend us? (0-10)']) >= 9 ? 'Promoter' : Number($('Feedback Form').item.json['How likely are you to recommend us? (0-10)']) >= 7 ? 'Passive' : 'Detractor' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "eec4ac43-18fa-5c13-9249-4654ad91ffac",
+      "name": "Score Feedback",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Config').first().json.sheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Feedback",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Date": "={{ $json.date }}",
+            "Name": "={{ $json.name }}",
+            "Email": "={{ $json.email }}",
+            "Score": "={{ $json.score }}",
+            "Category": "={{ $json.category }}",
+            "Comment": "={{ $json.comment }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Score",
+              "displayName": "Score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Category",
+              "displayName": "Category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Comment",
+              "displayName": "Comment",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1f95146-495b-50fa-9ba2-fd87733e2473",
+      "name": "Log Feedback",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        720,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "4addd5e4-2199-5a28-b0dd-5770c41a06f6",
+              "leftValue": "={{ $('Score Feedback').item.json.score }}",
+              "rightValue": 9,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "7ded048f-1535-528d-9c3f-c38c9808a6fe",
+      "name": "Promoter (9-10)?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('Config').first().json.fromEmail }}",
+        "toEmail": "={{ $('Score Feedback').item.json.email }}",
+        "subject": "=Thank you, {{ $('Score Feedback').item.json.firstName }}! One small favor?",
+        "emailFormat": "html",
+        "html": "=<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:560px;margin:0 auto;padding:24px\"><p>Hi {{ $('Score Feedback').item.json.firstName }},</p><p>Thank you so much for the kind feedback — it made our day!</p><p>Would you be willing to share it on Google? It takes 30 seconds and helps other people find a business they can trust.</p><p style=\"margin:24px 0\"><a href=\"{{ $('Config').first().json.reviewLink }}\" style=\"background:{{ $('Config').first().json.brandColor }};color:#ffffff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block\">Post your review</a></p><p>Thank you!</p><p style=\"margin-top:32px;color:#6b7280;font-size:13px\">{{ $('Config').first().json.businessName }}</p></div>",
+        "options": {
+          "appendAttribution": false,
+          "replyTo": "={{ $('Config').first().json.ownerEmail }}"
+        }
+      },
+      "id": "1f8f44ee-0a2e-5029-8f2e-b0ccadc1bdff",
+      "name": "Ask for Google Review",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1200,
+        160
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3f1443df-1aa9-5bb8-8fe5-370214982012",
+              "leftValue": "={{ $('Score Feedback').item.json.score }}",
+              "rightValue": 6,
+              "operator": {
+                "type": "number",
+                "operation": "lte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "id": "28ecf895-b0dd-5548-b130-b8f90e674629",
+      "name": "Detractor (0-6)?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        440
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('Config').first().json.fromEmail }}",
+        "toEmail": "={{ $('Config').first().json.ownerEmail }}",
+        "subject": "=⚠️ Unhappy customer: {{ $('Score Feedback').item.json.name }} scored {{ $('Score Feedback').item.json.score }}/10",
+        "emailFormat": "html",
+        "html": "=<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:560px;margin:0 auto;padding:24px\"><p><b>{{ $('Score Feedback').item.json.name }}</b> ({{ $('Score Feedback').item.json.email }}) gave a score of <b>{{ $('Score Feedback').item.json.score }}/10</b>.</p><p><b>Their reason:</b><br>{{ $('Score Feedback').item.json.comment || '(no comment)' }}</p><p>A personal call or email in the next 24 hours can turn this around. Just hit Reply.</p><p style=\"margin-top:32px;color:#6b7280;font-size:13px\">{{ $('Config').first().json.businessName }}</p></div>",
+        "options": {
+          "appendAttribution": false,
+          "replyTo": "={{ $('Score Feedback').item.json.email }}"
+        }
+      },
+      "id": "bac625f5-b23f-5c2e-a2c0-1586c6cbbe04",
+      "name": "Alert Owner",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1440,
+        360
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('Config').first().json.fromEmail }}",
+        "toEmail": "={{ $('Score Feedback').item.json.email }}",
+        "subject": "=Thank you for your honesty, {{ $('Score Feedback').item.json.firstName }}",
+        "emailFormat": "html",
+        "html": "=<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:560px;margin:0 auto;padding:24px\"><p>Hi {{ $('Score Feedback').item.json.firstName }},</p><p>Thank you for telling us — I'm sorry we didn't get it right this time.</p><p>I've personally read your feedback and someone from our team will be in touch shortly to make it right. If you'd like to tell us more in the meantime, just reply to this email.</p><p style=\"margin-top:32px;color:#6b7280;font-size:13px\">{{ $('Config').first().json.businessName }}</p></div>",
+        "options": {
+          "appendAttribution": false,
+          "replyTo": "={{ $('Config').first().json.ownerEmail }}"
+        }
+      },
+      "id": "844a6b92-8047-5dae-b29c-e050cc426403",
+      "name": "Apology to Customer",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1680,
+        360
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('Config').first().json.fromEmail }}",
+        "toEmail": "={{ $('Score Feedback').item.json.email }}",
+        "subject": "=Thanks for your feedback, {{ $('Score Feedback').item.json.firstName }}",
+        "emailFormat": "html",
+        "html": "=<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:560px;margin:0 auto;padding:24px\"><p>Hi {{ $('Score Feedback').item.json.firstName }},</p><p>Thanks for taking the time to rate us. We're always trying to improve — if there's one thing that would have made your experience a 10, just reply and let us know.</p><p style=\"margin-top:32px;color:#6b7280;font-size:13px\">{{ $('Config').first().json.businessName }}</p></div>",
+        "options": {
+          "appendAttribution": false,
+          "replyTo": "={{ $('Config').first().json.ownerEmail }}"
+        }
+      },
+      "id": "4e9706d2-3ecb-5dd1-8af3-f983ba31f4a7",
+      "name": "Thank Passive Customer",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1440,
+        560
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Customer Feedback Router\nA 2-question feedback form that sends happy customers to Google to leave a review — and sends unhappy customers straight to you, so you can fix things privately.\n\n### Setup\n1. Create a sheet tab named **Feedback** with the headers in `sheet-Feedback.csv`.\n2. Fill in **Config** (emails, sheet ID, Google review link).\n3. Pick your **Google Sheets** credential (*Log Feedback*) and **SMTP** credential (4 email nodes).\n4. Activate, then copy the **Production URL** from *Feedback Form*. Send it after every job/visit (or put it on receipts as a QR code).\n\nFull guide: README.md in this workflow's folder.",
+        "height": 417,
+        "width": 500,
+        "color": 7
+      },
+      "id": "657f9a2b-2433-5d56-89e9-20f83376ca37",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        80
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Feedback Form": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Score Feedback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score Feedback": {
+      "main": [
+        [
+          {
+            "node": "Log Feedback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Feedback": {
+      "main": [
+        [
+          {
+            "node": "Promoter (9-10)?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Promoter (9-10)?": {
+      "main": [
+        [
+          {
+            "node": "Ask for Google Review",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Detractor (0-6)?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detractor (0-6)?": {
+      "main": [
+        [
+          {
+            "node": "Alert Owner",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Thank Passive Customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alert Owner": {
+      "main": [
+        [
+          {
+            "node": "Apology to Customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

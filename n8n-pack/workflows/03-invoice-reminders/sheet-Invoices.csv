@@ -1,0 +1,2 @@
+Invoice ID,Client Name,Client Email,Amount,Currency,Due Date,Status,Payment Link,Last Reminder Stage,Last Reminder Date
+INV-1001,Acme Ltd,accounts@acme.example,450,USD,2026-11-20,Unpaid,https://buy.stripe.com/test_123,,

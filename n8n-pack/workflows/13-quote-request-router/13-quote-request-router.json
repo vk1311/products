@@ -1,0 +1,505 @@
+{
+  "name": "13 · Quote Request Intake & Routing",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Request a free quote",
+        "formDescription": "Tell us about your project and we'll get back to you with a quote.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Name",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Email",
+              "fieldType": "email",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Phone",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Service",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Installation"
+                  },
+                  {
+                    "option": "Repair"
+                  },
+                  {
+                    "option": "Maintenance"
+                  },
+                  {
+                    "option": "Consultation"
+                  },
+                  {
+                    "option": "Other"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Budget",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Under $500"
+                  },
+                  {
+                    "option": "$500 - $2,000"
+                  },
+                  {
+                    "option": "$2,000 - $10,000"
+                  },
+                  {
+                    "option": "$10,000+"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "When do you need this?",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "ASAP"
+                  },
+                  {
+                    "option": "Within 2 weeks"
+                  },
+                  {
+                    "option": "Within a month"
+                  },
+                  {
+                    "option": "Just researching"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Project details",
+              "fieldType": "textarea",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Address or postcode"
+            }
+          ]
+        },
+        "options": {
+          "appendAttribution": false,
+          "respondWithOptions": {
+            "values": {
+              "respondWith": "text",
+              "formSubmittedText": "Thanks! Your quote request has been received — check your inbox for a confirmation."
+            }
+          }
+        }
+      },
+      "id": "cfacec6a-51e3-5ad8-ba46-77b87378e208",
+      "name": "Quote Request Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "733d0de6-7b34-5b90-a2cb-775a6241432a"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1139b18b-8b3e-579a-9aad-ccef9f86053d",
+              "name": "businessName",
+              "value": "Your Business Name",
+              "type": "string"
+            },
+            {
+              "id": "046f42e9-f510-510b-a16a-beb4a73219e7",
+              "name": "fromEmail",
+              "value": "quotes@yourbusiness.com",
+              "type": "string"
+            },
+            {
+              "id": "40768974-8513-5398-b1ba-5def339fdeb0",
+              "name": "ownerEmail",
+              "value": "you@yourbusiness.com",
+              "type": "string"
+            },
+            {
+              "id": "4f71fca9-a5de-5025-97f2-47dcd27e8a04",
+              "name": "sheetId",
+              "value": "PASTE_YOUR_GOOGLE_SHEET_ID",
+              "type": "string"
+            },
+            {
+              "id": "b13ecda1-1663-5fe0-bfc3-798147b95cca",
+              "name": "routingRules",
+              "value": "{\"Installation\":\"sales@yourbusiness.com\",\"Repair\":\"service@yourbusiness.com\",\"Maintenance\":\"service@yourbusiness.com\"}",
+              "type": "string"
+            },
+            {
+              "id": "63adba5b-c62d-533a-b65f-9c1fde175aa3",
+              "name": "responseTime",
+              "value": "24 hours",
+              "type": "string"
+            },
+            {
+              "id": "8dc2339a-c667-51d4-9b31-aaff61f90825",
+              "name": "timezone",
+              "value": "America/New_York",
+              "type": "string"
+            },
+            {
+              "id": "ef4f7da2-4d2b-5fd7-bae8-f076f156060b",
+              "name": "brandColor",
+              "value": "#2563eb",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "69a77d36-3921-500d-8f2e-fd3887c3b9b4",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        300
+      ],
+      "notes": "Edit these values for your business.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ---- helpers (shared by the workflows in this pack) ----\nconst cfg = $('Config').first().json;\nconst zone = cfg.timezone || 'UTC';\nconst now = DateTime.now().setZone(zone);\nconst today = now.startOf('day');\n\n// Read the first non-empty value among several possible column names.\nconst val = (row, ...keys) => {\n  for (const k of keys) {\n    const v = row[k];\n    if (v !== undefined && v !== null && String(v).trim() !== '') return String(v).trim();\n  }\n  return '';\n};\n\n// Accepts 2026-11-20, 2026-11-20T14:30, 11/20/2026, 20.11.2026, Nov 20, 2026 or a Sheets serial number.\nfunction parseDate(v) {\n  if (v === undefined || v === null || v === '') return null;\n  if (typeof v === 'number') {\n    return DateTime.fromMillis(Math.round((v - 25569) * 86400000), { zone: 'utc' })\n      .setZone(zone, { keepLocalTime: true });\n  }\n  const s = String(v).trim();\n  let d = DateTime.fromISO(s, { zone });\n  if (d.isValid) return d;\n  d = DateTime.fromSQL(s, { zone });\n  if (d.isValid) return d;\n  for (const f of ['M/d/yyyy', 'M/d/yyyy H:mm', 'M/d/yyyy h:mm a', 'M/d/yy', 'd.M.yyyy', 'yyyy/M/d', 'd MMM yyyy', 'MMM d, yyyy', 'MMMM d, yyyy']) {\n    d = DateTime.fromFormat(s, f, { zone });\n    if (d.isValid) return d;\n  }\n  const js = new Date(s);\n  return isNaN(js) ? null : DateTime.fromJSDate(js).setZone(zone);\n}\n\n// Whole days between a date and today (positive = in the past).\nconst daysAgo = (d) => Math.round(today.diff(d.startOf('day'), 'days').days);\n\nconst firstName = (name) => (String(name || '').trim().split(/\\s+/)[0] || 'there');\n\nconst toNumber = (v) => {\n  if (typeof v === 'number') return v;\n  const n = parseFloat(String(v ?? '').replace(/[^0-9.\\-]/g, ''));\n  return isNaN(n) ? 0 : n;\n};\n\nfunction money(amount, currency) {\n  const cur = (currency || cfg.currency || 'USD').toUpperCase();\n  try {\n    return new Intl.NumberFormat(cfg.locale || 'en-US', { style: 'currency', currency: cur }).format(toNumber(amount));\n  } catch (e) {\n    return cur + ' ' + toNumber(amount).toFixed(2);\n  }\n}\n\nconst esc = (s) => String(s ?? '').replace(/[&<>\"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' }[c]));\n\nconst button = (url, label) => url\n  ? `<p style=\"margin:24px 0\"><a href=\"${esc(url)}\" style=\"background:${cfg.brandColor || '#2563eb'};color:#ffffff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block\">${esc(label)}</a></p>`\n  : '';\n\n// Wraps body HTML in a clean, mobile-friendly email layout.\nconst layout = (inner) => `<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:560px;margin:0 auto;padding:24px\">${inner}<p style=\"margin-top:32px;color:#6b7280;font-size:13px\">${esc(cfg.businessName || '')}</p></div>`;\n// ---- end helpers ----\n\n// Decides WHO gets the request (Config → routingRules) and HOW urgent it is.\nconst f = $('Quote Request Form').first().json;\nlet routes = {};\ntry { routes = JSON.parse(cfg.routingRules || '{}'); } catch (e) { /* invalid JSON → everything goes to ownerEmail */ }\n\nconst BUDGETS = ['Under $500', '$500 - $2,000', '$2,000 - $10,000', '$10,000+'];\nconst budgetLevel = BUDGETS.indexOf(f['Budget']);    // 0..3\nconst urgent = f['When do you need this?'] === 'ASAP';\nconst big = budgetLevel >= 2;\nconst priority = urgent && big ? 'HOT' : urgent || big ? 'Warm' : 'Normal';\n\nreturn [{\n  json: {\n    quoteId: 'Q-' + now.toFormat('yyMMdd') + '-' + Math.random().toString(36).slice(2, 6).toUpperCase(),\n    date: now.toFormat('yyyy-MM-dd HH:mm'),\n    name: f['Name'],\n    firstName: firstName(f['Name']),\n    email: f['Email'],\n    phone: f['Phone'],\n    service: f['Service'],\n    budget: f['Budget'],\n    timeline: f['When do you need this?'],\n    details: f['Project details'],\n    detailsHtml: esc(f['Project details']).replace(/\\n/g, '<br>'),\n    address: f['Address or postcode'] || '',\n    assignedTo: routes[f['Service']] || cfg.ownerEmail,\n    priority,\n  },\n}];\n"
+      },
+      "id": "c167718c-c2c2-5454-9e56-d44c87d4facc",
+      "name": "Route & Prioritize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Config').first().json.sheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Quotes",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Quote ID": "={{ $json.quoteId }}",
+            "Date": "={{ $json.date }}",
+            "Name": "={{ $json.name }}",
+            "Email": "={{ $json.email }}",
+            "Phone": "={{ $json.phone }}",
+            "Service": "={{ $json.service }}",
+            "Budget": "={{ $json.budget }}",
+            "Timeline": "={{ $json.timeline }}",
+            "Details": "={{ $json.details }}",
+            "Address": "={{ $json.address }}",
+            "Priority": "={{ $json.priority }}",
+            "Assigned To": "={{ $json.assignedTo }}",
+            "Status": "New"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Quote ID",
+              "displayName": "Quote ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Date",
+              "displayName": "Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Service",
+              "displayName": "Service",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Budget",
+              "displayName": "Budget",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Timeline",
+              "displayName": "Timeline",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Details",
+              "displayName": "Details",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Address",
+              "displayName": "Address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Priority",
+              "displayName": "Priority",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Assigned To",
+              "displayName": "Assigned To",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e382d053-19de-544e-beb8-fc8e56ad9286",
+      "name": "Save Quote Request",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        720,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('Config').first().json.fromEmail }}",
+        "toEmail": "={{ $('Route & Prioritize').item.json.assignedTo }}",
+        "subject": "=[{{ $('Route & Prioritize').item.json.priority }}] Quote request {{ $('Route & Prioritize').item.json.quoteId }}: {{ $('Route & Prioritize').item.json.service }} for {{ $('Route & Prioritize').item.json.name }}",
+        "emailFormat": "html",
+        "html": "=<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:560px;margin:0 auto;padding:24px\"><h2 style=\"margin-top:0\">New quote request — {{ $('Route & Prioritize').item.json.priority }} priority</h2><p><b>Quote ID:</b> {{ $('Route & Prioritize').item.json.quoteId }}<br><b>Name:</b> {{ $('Route & Prioritize').item.json.name }}<br><b>Email:</b> {{ $('Route & Prioritize').item.json.email }}<br><b>Phone:</b> {{ $('Route & Prioritize').item.json.phone }}<br><b>Service:</b> {{ $('Route & Prioritize').item.json.service }}<br><b>Budget:</b> {{ $('Route & Prioritize').item.json.budget }}<br><b>Timeline:</b> {{ $('Route & Prioritize').item.json.timeline }}<br><b>Address:</b> {{ $('Route & Prioritize').item.json.address || '—' }}</p><p><b>Details:</b><br>{{ $('Route & Prioritize').item.json.detailsHtml }}</p><p>Reply to this email to answer the customer directly. We promised a reply within {{ $('Config').first().json.responseTime }}.</p><p style=\"margin-top:32px;color:#6b7280;font-size:13px\">{{ $('Config').first().json.businessName }}</p></div>",
+        "options": {
+          "appendAttribution": false,
+          "replyTo": "={{ $('Route & Prioritize').item.json.email }}",
+          "bccEmail": "={{ $('Route & Prioritize').item.json.assignedTo === $('Config').first().json.ownerEmail ? '' : $('Config').first().json.ownerEmail }}"
+        }
+      },
+      "id": "2dd20217-7a49-59b3-893d-34163e52582e",
+      "name": "Email Assigned Team Member",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        960,
+        300
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('Config').first().json.fromEmail }}",
+        "toEmail": "={{ $('Route & Prioritize').item.json.email }}",
+        "subject": "=We've got your quote request ({{ $('Route & Prioritize').item.json.quoteId }})",
+        "emailFormat": "html",
+        "html": "=<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:560px;margin:0 auto;padding:24px\"><p>Hi {{ $('Route & Prioritize').item.json.firstName }},</p><p>Thanks for asking {{ $('Config').first().json.businessName }} for a quote. We've received your request for <b>{{ $('Route & Prioritize').item.json.service }}</b> and will get back to you within <b>{{ $('Config').first().json.responseTime }}</b>.</p><p>Your reference: <b>{{ $('Route & Prioritize').item.json.quoteId }}</b></p><p>If you have photos or plans that would help, just reply to this email and attach them.</p><p style=\"margin-top:32px;color:#6b7280;font-size:13px\">{{ $('Config').first().json.businessName }}</p></div>",
+        "options": {
+          "appendAttribution": false,
+          "replyTo": "={{ $('Route & Prioritize').item.json.assignedTo }}"
+        }
+      },
+      "id": "7dfdb300-5513-5984-a3b3-5cc28cff604d",
+      "name": "Confirm to Customer",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1200,
+        300
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Quote Request Intake & Routing\nA professional quote request form that scores how hot each lead is, sends it to the right person on your team, logs it to a sheet and confirms with the customer.\n\n### Setup\n1. Create a sheet tab named **Quotes** with the headers in `sheet-Quotes.csv`.\n2. In **Config**, set your emails, sheet ID and `routingRules` — a simple list of *service → email*, e.g. `{\"Repair\":\"mike@you.com\"}`. Anything not listed goes to `ownerEmail`.\n3. Edit the form's *Service* and *Budget* options to match what you sell. (If you change budget options, update the `BUDGETS` list in **Route & Prioritize** too.)\n4. Pick your **Google Sheets** and **SMTP** credentials.\n5. Activate and link the form's **Production URL** from your website's \"Get a quote\" button.\n\nFull guide: README.md in this workflow's folder.",
+        "height": 480,
+        "width": 500,
+        "color": 7
+      },
+      "id": "a44394e8-80f5-555f-a2c1-805f3999875a",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        220
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Quote Request Form": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Route & Prioritize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route & Prioritize": {
+      "main": [
+        [
+          {
+            "node": "Save Quote Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Quote Request": {
+      "main": [
+        [
+          {
+            "node": "Email Assigned Team Member",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Assigned Team Member": {
+      "main": [
+        [
+          {
+            "node": "Confirm to Customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

@@ -1,0 +1,2 @@
+Appointment ID,Client Name,Client Email,Client Phone,Date,Time,Service,Status,Reminder 24h Sent,Reminder 2h Sent,No-show Followed Up
+A-3002,Tom Baker,tom@example.com,+15559876543,2026-11-04,10:00,Consultation,No-show,2026-11-03 10:00,2026-11-04 08:00,

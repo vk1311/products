@@ -1,0 +1,311 @@
+{
+  "name": "15 · Customer Birthday Offers",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 8,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "39cdc261-04f6-502d-829f-c990a7516b3c",
+      "name": "Every Day 8am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "978cc53e-e755-5841-bf6f-49b7084ea92f",
+              "name": "businessName",
+              "value": "Your Business Name",
+              "type": "string"
+            },
+            {
+              "id": "c25cc2bf-f0ab-5c91-b3b0-0156118a5482",
+              "name": "fromEmail",
+              "value": "hello@yourbusiness.com",
+              "type": "string"
+            },
+            {
+              "id": "98da86d7-ca6b-5d4a-b718-043a378c9612",
+              "name": "ownerEmail",
+              "value": "you@yourbusiness.com",
+              "type": "string"
+            },
+            {
+              "id": "8453727a-8bc8-54bd-a3b6-b6b7fff92e32",
+              "name": "sheetId",
+              "value": "PASTE_YOUR_GOOGLE_SHEET_ID",
+              "type": "string"
+            },
+            {
+              "id": "a9003dba-383b-5c05-989b-bd4e8d88a902",
+              "name": "offerCode",
+              "value": "BIRTHDAY15",
+              "type": "string"
+            },
+            {
+              "id": "33e00470-b6c6-53ac-a2c5-b04dbaccbc2b",
+              "name": "offerText",
+              "value": "15% off anything this month",
+              "type": "string"
+            },
+            {
+              "id": "4af8c089-0a92-5089-bc8c-72e64d1ecaff",
+              "name": "websiteUrl",
+              "value": "https://yourbusiness.com",
+              "type": "string"
+            },
+            {
+              "id": "48a14dab-134b-5491-8e26-4860bc95828f",
+              "name": "timezone",
+              "value": "America/New_York",
+              "type": "string"
+            },
+            {
+              "id": "2a5f8219-d932-5c49-993b-997302b4fc41",
+              "name": "brandColor",
+              "value": "#2563eb",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "6a834fa4-56c9-54b6-b566-e33b190d6c28",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        300
+      ],
+      "notes": "Edit these values for your business.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Config').first().json.sheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Customers",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "64a4cb1e-c228-51c9-8b9f-4cef8ae5a7e0",
+      "name": "Get Customers",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        480,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Google Sheets account"
+        }
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// ---- helpers (shared by the workflows in this pack) ----\nconst cfg = $('Config').first().json;\nconst zone = cfg.timezone || 'UTC';\nconst now = DateTime.now().setZone(zone);\nconst today = now.startOf('day');\n\n// Read the first non-empty value among several possible column names.\nconst val = (row, ...keys) => {\n  for (const k of keys) {\n    const v = row[k];\n    if (v !== undefined && v !== null && String(v).trim() !== '') return String(v).trim();\n  }\n  return '';\n};\n\n// Accepts 2026-11-20, 2026-11-20T14:30, 11/20/2026, 20.11.2026, Nov 20, 2026 or a Sheets serial number.\nfunction parseDate(v) {\n  if (v === undefined || v === null || v === '') return null;\n  if (typeof v === 'number') {\n    return DateTime.fromMillis(Math.round((v - 25569) * 86400000), { zone: 'utc' })\n      .setZone(zone, { keepLocalTime: true });\n  }\n  const s = String(v).trim();\n  let d = DateTime.fromISO(s, { zone });\n  if (d.isValid) return d;\n  d = DateTime.fromSQL(s, { zone });\n  if (d.isValid) return d;\n  for (const f of ['M/d/yyyy', 'M/d/yyyy H:mm', 'M/d/yyyy h:mm a', 'M/d/yy', 'd.M.yyyy', 'yyyy/M/d', 'd MMM yyyy', 'MMM d, yyyy', 'MMMM d, yyyy']) {\n    d = DateTime.fromFormat(s, f, { zone });\n    if (d.isValid) return d;\n  }\n  const js = new Date(s);\n  return isNaN(js) ? null : DateTime.fromJSDate(js).setZone(zone);\n}\n\n// Whole days between a date and today (positive = in the past).\nconst daysAgo = (d) => Math.round(today.diff(d.startOf('day'), 'days').days);\n\nconst firstName = (name) => (String(name || '').trim().split(/\\s+/)[0] || 'there');\n\nconst toNumber = (v) => {\n  if (typeof v === 'number') return v;\n  const n = parseFloat(String(v ?? '').replace(/[^0-9.\\-]/g, ''));\n  return isNaN(n) ? 0 : n;\n};\n\nfunction money(amount, currency) {\n  const cur = (currency || cfg.currency || 'USD').toUpperCase();\n  try {\n    return new Intl.NumberFormat(cfg.locale || 'en-US', { style: 'currency', currency: cur }).format(toNumber(amount));\n  } catch (e) {\n    return cur + ' ' + toNumber(amount).toFixed(2);\n  }\n}\n\nconst esc = (s) => String(s ?? '').replace(/[&<>\"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' }[c]));\n\nconst button = (url, label) => url\n  ? `<p style=\"margin:24px 0\"><a href=\"${esc(url)}\" style=\"background:${cfg.brandColor || '#2563eb'};color:#ffffff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block\">${esc(label)}</a></p>`\n  : '';\n\n// Wraps body HTML in a clean, mobile-friendly email layout.\nconst layout = (inner) => `<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:560px;margin:0 auto;padding:24px\">${inner}<p style=\"margin-top:32px;color:#6b7280;font-size:13px\">${esc(cfg.businessName || '')}</p></div>`;\n// ---- end helpers ----\n\n// Birthday can be written as 1990-04-12, 04-12, 4/12 or 12 Apr. Year is optional.\nfunction birthday(v) {\n  const s = String(v || '').trim();\n  let m = s.match(/^(?:\\d{4}-)?(\\d{1,2})-(\\d{1,2})/);                 // 1990-04-12 or 04-12\n  if (m) return { month: +m[1], day: +m[2] };\n  m = s.match(/^(\\d{1,2})\\/(\\d{1,2})(?:\\/\\d{2,4})?$/);                 // 4/12 or 4/12/1990 (month first)\n  if (m) return { month: +m[1], day: +m[2] };\n  const d = parseDate(s);\n  return d ? { month: d.month, day: d.day } : null;\n}\nconst isLeap = (y) => (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;\nconst out = [];\n$input.all().forEach((item, i) => {\n  const r = item.json;\n  const email = val(r, 'Email');\n  const b = birthday(r['Birthday']);\n  if (!email || !b) return;\n  let { month, day } = b;\n  if (month === 2 && day === 29 && !isLeap(today.year)) day = 28;     // leap-day birthdays celebrated on the 28th\n  if (month !== today.month || day !== today.day) return;\n  if (val(r, 'Last Birthday Email') === String(today.year)) return;\n  if (['no', 'unsubscribed', 'false'].includes(val(r, 'Marketing OK').toLowerCase())) return;\n  out.push({ json: { email, name: firstName(val(r, 'Name')), year: String(today.year) }, pairedItem: { item: i } });\n});\nreturn out;\n"
+      },
+      "id": "8eb1e87e-8462-5aa9-9481-055cedb05d0c",
+      "name": "Find Birthdays Today",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('Config').first().json.fromEmail }}",
+        "toEmail": "={{ $json.email }}",
+        "subject": "=Happy birthday, {{ $json.name }}! 🎂 A gift from us",
+        "emailFormat": "html",
+        "html": "=<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:560px;margin:0 auto;padding:24px\"><p style=\"font-size:40px;margin:0\">🎂</p><p>Happy birthday, {{ $json.name }}!</p><p>Everyone here at {{ $('Config').first().json.businessName }} hopes you have a brilliant day. As a small thank-you for being a customer, here's <b>{{ $('Config').first().json.offerText }}</b>:</p><p style=\"font-size:24px;font-weight:bold;letter-spacing:2px;border:2px dashed #d1d5db;display:inline-block;padding:8px 16px\">{{ $('Config').first().json.offerCode }}</p><p style=\"margin:24px 0\"><a href=\"{{ $('Config').first().json.websiteUrl }}\" style=\"background:{{ $('Config').first().json.brandColor }};color:#ffffff;padding:12px 22px;border-radius:6px;text-decoration:none;font-weight:bold;display:inline-block\">Treat yourself</a></p><p>Enjoy your day!</p><p style=\"margin-top:32px;color:#6b7280;font-size:13px\">{{ $('Config').first().json.businessName }}</p></div>",
+        "options": {
+          "appendAttribution": false,
+          "replyTo": "={{ $('Config').first().json.ownerEmail }}"
+        }
+      },
+      "id": "39755369-1a62-5c7c-89cf-8d06134d7bf4",
+      "name": "Send Birthday Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        960,
+        300
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $('Config').first().json.sheetId }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Customers",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Email": "={{ $('Find Birthdays Today').item.json.email }}",
+            "Last Birthday Email": "={{ $('Find Birthdays Today').item.json.year }}"
+          },
+          "matchingColumns": [
+            "Email"
+          ],
+          "schema": [
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Last Birthday Email",
+              "displayName": "Last Birthday Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "73fe4952-0adb-571f-98cd-657652e331eb",
+      "name": "Mark as Sent This Year",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1200,
+        300
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Customer Birthday Offers\nSends every customer a warm birthday email with a discount code on their birthday — a simple, personal touch customers remember.\n\n### Setup\n1. Create a sheet tab named **Customers** with the headers in `sheet-Customers.csv`. Collect birthdays at sign-up or checkout (\"Get a treat on your birthday!\").\n2. Create the discount code in your shop/POS (Shopify, Square, WooCommerce...) and enter it in **Config → offerCode**.\n3. Fill in the rest of **Config**, pick your **Google Sheets** and **SMTP** credentials, then **Activate**.\n\nFull guide: README.md in this workflow's folder.",
+        "height": 396,
+        "width": 500,
+        "color": 7
+      },
+      "id": "d5928b18-602d-5b52-83af-830d6a96a910",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        220
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every Day 8am": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Get Customers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Customers": {
+      "main": [
+        [
+          {
+            "node": "Find Birthdays Today",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Birthdays Today": {
+      "main": [
+        [
+          {
+            "node": "Send Birthday Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Birthday Email": {
+      "main": [
+        [
+          {
+            "node": "Mark as Sent This Year",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

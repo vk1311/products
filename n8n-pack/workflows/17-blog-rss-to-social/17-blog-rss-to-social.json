@@ -1,0 +1,269 @@
+{
+  "name": "17 · New Blog Post → Auto-Share to Social Media",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyHour"
+            }
+          ]
+        },
+        "feedUrl": "https://yourbusiness.com/blog/feed"
+      },
+      "id": "f6c3da09-ba63-5bec-8115-5e0ae126f799",
+      "name": "New Blog Post (RSS)",
+      "type": "n8n-nodes-base.rssFeedReadTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        400
+      ],
+      "notes": "Put YOUR blog's RSS feed URL here.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "5cc3fd09-8878-52ff-b7c1-f92a9897750c",
+              "name": "hashtags",
+              "value": "#smallbusiness",
+              "type": "string"
+            },
+            {
+              "id": "fc46fff7-5d12-5514-ba73-179354bbda13",
+              "name": "telegramChannel",
+              "value": "@yourchannel",
+              "type": "string"
+            },
+            {
+              "id": "82fffcd5-e6d0-564c-9127-ecc34b443445",
+              "name": "linkedinPersonId",
+              "value": "YOUR_LINKEDIN_PERSON_ID",
+              "type": "string"
+            },
+            {
+              "id": "1e290950-ed9d-5428-8cec-f78e0f3e2e20",
+              "name": "facebookPageId",
+              "value": "YOUR_FACEBOOK_PAGE_ID",
+              "type": "string"
+            },
+            {
+              "id": "d9e184be-7306-5693-bac9-021cb3321bd5",
+              "name": "maxAgeHours",
+              "value": 48,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4269e645-7e1f-58e7-9727-9b4cd98ce089",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        400
+      ],
+      "notes": "Edit these values for your business.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "// One post per new article. Old articles are skipped (Config → maxAgeHours) so the first run can't flood your feeds.\nconst cfg = $('Config').first().json;\nconst tags = String(cfg.hashtags || '').trim();\nconst out = [];\n$('New Blog Post (RSS)').all().forEach((item, i) => {\n  const a = item.json;\n  const published = DateTime.fromISO(a.isoDate || '') ;\n  if (published.isValid && DateTime.now().diff(published, 'hours').hours > Number(cfg.maxAgeHours || 48)) return;\n  const title = String(a.title || '').trim();\n  const link = a.link || '';\n  const snippet = String(a.contentSnippet || a.content || '').replace(/\\s+/g, ' ').trim().slice(0, 220);\n  const xBudget = 280 - 25 - (tags ? tags.length + 2 : 0);\n  const xTitle = title.length > xBudget ? title.slice(0, xBudget - 1) + '…' : title;\n  out.push({\n    json: {\n      title, link,\n      xPost: ['New on the blog: ' + xTitle, link, tags].filter(Boolean).join('\\n\\n').slice(0, 1000),\n      longPost: [`📝 New on the blog: ${title}`, snippet ? snippet + (snippet.length >= 220 ? '…' : '') : '', link, tags].filter(Boolean).join('\\n\\n'),\n      snippet,\n    },\n    pairedItem: { item: i },\n  });\n});\nreturn out;\n"
+      },
+      "id": "2853d86e-cc89-5768-9eb9-b71606e92028",
+      "name": "Compose Posts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "text": "={{ $json.xPost }}",
+        "additionalFields": {}
+      },
+      "id": "e50cac63-0219-56c0-b154-900ae8b95a63",
+      "name": "Post to X",
+      "type": "n8n-nodes-base.twitter",
+      "typeVersion": 2,
+      "position": [
+        760,
+        100
+      ],
+      "credentials": {
+        "twitterOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "X account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "person": "={{ $('Config').first().json.linkedinPersonId }}",
+        "text": "={{ $json.longPost }}",
+        "shareMediaCategory": "ARTICLE",
+        "additionalFields": {
+          "originalUrl": "={{ $json.link }}",
+          "title": "={{ $json.title }}",
+          "description": "={{ $json.snippet }}"
+        }
+      },
+      "id": "fe094a94-cbf8-5d27-8da4-5c3f7e3139bc",
+      "name": "Post to LinkedIn",
+      "type": "n8n-nodes-base.linkedIn",
+      "typeVersion": 1,
+      "position": [
+        760,
+        300
+      ],
+      "credentials": {
+        "linkedInOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "LinkedIn account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpRequestMethod": "POST",
+        "node": "={{ $('Config').first().json.facebookPageId }}",
+        "edge": "feed",
+        "options": {
+          "queryParameters": {
+            "parameter": [
+              {
+                "name": "message",
+                "value": "={{ $json.longPost }}"
+              },
+              {
+                "name": "link",
+                "value": "={{ $json.link }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "0b76983e-bdcf-58cf-88f8-caa3cea86022",
+      "name": "Post to Facebook Page",
+      "type": "n8n-nodes-base.facebookGraphApi",
+      "typeVersion": 1,
+      "position": [
+        760,
+        500
+      ],
+      "credentials": {
+        "facebookGraphApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Facebook Graph account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Config').first().json.telegramChannel }}",
+        "text": "=📝 <b>{{ $json.title.replace(/[<>&]/g, '') }}</b>\n\n{{ $json.snippet.replace(/[<>&]/g, '') }}\n\n{{ $json.link }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "936e3a58-9266-5dca-ba46-9964f6b323c6",
+      "name": "Post to Telegram Channel",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        760,
+        700
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Blog Post → Auto-Share to Social\nPublish a blog post and it's automatically shared to X, LinkedIn, your Facebook Page and Telegram within the hour — with the title, a short teaser and the link.\n\n### Setup\n1. Open **New Blog Post (RSS)** and paste your feed URL (usually `yoursite.com/feed`, `/rss` or `/blog/rss.xml`).\n2. Set up credentials for the platforms you use (see workflow 06's README for X, LinkedIn, Facebook and Telegram instructions) and fill in **Config**.\n3. Delete the \"Post to ...\" nodes for platforms you don't use.\n4. Click **Activate**.\n\nFull guide: README.md in this workflow's folder.",
+        "height": 396,
+        "width": 500,
+        "color": 7
+      },
+      "id": "acc31558-c484-5d5e-a789-aeb150d2655c",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        20
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "New Blog Post (RSS)": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Compose Posts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compose Posts": {
+      "main": [
+        [
+          {
+            "node": "Post to X",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Post to LinkedIn",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Post to Facebook Page",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Post to Telegram Channel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

@@ -1,0 +1,286 @@
+{
+  "name": "18 · Website Uptime Monitor (email + Telegram alerts)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "47fb5b42-c203-503d-84e1-54337e54a1d9",
+      "name": "Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a7d24899-ad2c-5d9f-915c-1f4f1e891938",
+              "name": "urls",
+              "value": "https://yourbusiness.com, https://shop.yourbusiness.com",
+              "type": "string"
+            },
+            {
+              "id": "68d2c23e-12f0-55d1-a786-921c18296b17",
+              "name": "mustContain",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "3d513933-ab82-5063-82a1-2814d95d5922",
+              "name": "businessName",
+              "value": "Your Business Name",
+              "type": "string"
+            },
+            {
+              "id": "4a55046d-cf27-53f2-ba4a-dd11838b4d4a",
+              "name": "fromEmail",
+              "value": "alerts@yourbusiness.com",
+              "type": "string"
+            },
+            {
+              "id": "18e7354b-6589-5673-b402-02ec40bfebaf",
+              "name": "ownerEmail",
+              "value": "you@yourbusiness.com",
+              "type": "string"
+            },
+            {
+              "id": "e81a4211-e6c6-5af5-a2ef-2aa00e760206",
+              "name": "telegramChatId",
+              "value": "123456789",
+              "type": "string"
+            },
+            {
+              "id": "a84ea40a-f000-51b7-9f38-3164fdc6c9f5",
+              "name": "timezone",
+              "value": "America/New_York",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8fa78450-b283-5cf8-be1f-cabce096cbcd",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        300
+      ],
+      "notes": "Edit these values for your business.",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\nreturn String(cfg.urls || '')\n  .split(/[\\s,]+/)\n  .filter(Boolean)\n  .map((url) => ({ json: { url: /^https?:\\/\\//.test(url) ? url : 'https://' + url } }));\n"
+      },
+      "id": "bd256f88-4c40-59fc-867a-8b4dfbf9b387",
+      "name": "One Item per URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (compatible; UptimeMonitor/1.0)"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "id": "4606c768-952f-5ce9-b245-1ce5055a6078",
+      "name": "Check Website",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        300
+      ],
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Only alerts when a site GOES DOWN or COMES BACK UP — not every 5 minutes while it's down.\n// State is remembered between runs (only in active/production mode, not manual tests).\nconst cfg = $('Config').first().json;\nconst zone = cfg.timezone || 'UTC';\nconst state = $getWorkflowStaticData('global');\nstate.sites = state.sites || {};\nconst urls = $('One Item per URL').all();\nconst now = DateTime.now().setZone(zone);\nconst out = [];\n\n$input.all().forEach((item, i) => {\n  const url = urls[i]?.json.url;\n  if (!url) return;\n  const r = item.json;\n  const code = Number(r.statusCode || 0);\n  let problem = '';\n  if (r.error) problem = typeof r.error === 'string' ? r.error : (r.error.message || 'Request failed');\n  else if (!code) problem = 'No response';\n  else if (code >= 400) problem = `HTTP ${code} ${r.statusMessage || ''}`.trim();\n  else if (cfg.mustContain && !String(r.body || r.data || '').includes(cfg.mustContain)) problem = `Page loaded but \"${cfg.mustContain}\" was not found`;\n\n  const prev = state.sites[url] || { up: true, since: now.toISO() };\n  const up = !problem;\n  if (prev.up && !up) {\n    state.sites[url] = { up: false, since: now.toISO() };\n    out.push({ json: { url, event: 'DOWN', emoji: '🔴', subject: `🔴 DOWN: ${url}`, detail: problem, at: now.toFormat('d LLL HH:mm') } });\n  } else if (!prev.up && up) {\n    const mins = Math.round(now.diff(DateTime.fromISO(prev.since), 'minutes').minutes);\n    state.sites[url] = { up: true, since: now.toISO() };\n    out.push({ json: { url, event: 'UP', emoji: '🟢', subject: `🟢 RECOVERED: ${url}`, detail: `Back online after about ${mins} minute${mins === 1 ? '' : 's'}.`, at: now.toFormat('d LLL HH:mm') } });\n  }\n});\nreturn out;\n"
+      },
+      "id": "37a6e162-08e7-5165-abb2-81d47da1e4cd",
+      "name": "Detect Status Changes",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $('Config').first().json.fromEmail }}",
+        "toEmail": "={{ $('Config').first().json.ownerEmail }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "html",
+        "html": "=<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:560px;margin:0 auto;padding:24px\"><h2 style=\"margin-top:0\">{{ $json.emoji }} {{ $json.url }} is {{ $json.event === 'DOWN' ? 'DOWN' : 'back UP' }}</h2><p><b>When:</b> {{ $json.at }}<br><b>Details:</b> {{ $json.detail }}</p><p style=\"color:#6b7280\">You'll get another email when the status changes.</p><p style=\"margin-top:32px;color:#6b7280;font-size:13px\">{{ $('Config').first().json.businessName }}</p></div>",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "d305bc90-195b-590d-9e89-1fb34624b150",
+      "name": "Email Alert",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1200,
+        200
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "SMTP account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Config').first().json.telegramChatId }}",
+        "text": "={{ $json.emoji }} <b>{{ $json.event }}</b>: {{ $json.url }}\n{{ $json.detail }}\n<i>{{ $json.at }}</i>",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "fb81982c-fa0e-5a6f-b849-805cc6285ce5",
+      "name": "Telegram Alert",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1200,
+        420
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "REPLACE_WITH_YOUR_CREDENTIAL",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Website Uptime Monitor\nChecks your website(s) every 5 minutes and alerts you by email and Telegram the moment one goes down — and again when it's back.\n\n### Setup\n1. In **Config**, list your URLs separated by commas. Optionally set `mustContain` to a word that's always on your homepage (e.g. your business name).\n2. Fill in your email and Telegram chat ID (see workflow 09's README for how to get a chat ID).\n3. Pick your **SMTP** and **Telegram** credentials (or delete the alert node you don't want).\n4. Click **Activate**. The \"remember last status\" feature only works while the workflow is active.\n\nFull guide: README.md in this workflow's folder.",
+        "height": 417,
+        "width": 500,
+        "color": 7
+      },
+      "id": "14107243-0f85-598f-9a91-255ee12696c2",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        120
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Every 5 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "One Item per URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "One Item per URL": {
+      "main": [
+        [
+          {
+            "node": "Check Website",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Website": {
+      "main": [
+        [
+          {
+            "node": "Detect Status Changes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Status Changes": {
+      "main": [
+        [
+          {
+            "node": "Email Alert",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Telegram Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}
