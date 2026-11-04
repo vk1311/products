@@ -39,6 +39,7 @@ for book in "${BOOKS[@]}"; do
     --template "$TOOLS/template.html" \
     --css "$TOOLS/book.css" \
     --toc --toc-depth=2 \
+    --wrap=none \
     --metadata lang=en-CA \
     --output "$html"
 
