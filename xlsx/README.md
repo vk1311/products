@@ -40,6 +40,15 @@ Set up for Canada by default (13% Ontario HST, CRA terms) – every rate is an e
 | 29 | [Attendance Tracker](templates/29-attendance-tracker.xlsx) | Monthly attendance grid with codes, weekend shading, per-employee totals and attendance %. |
 | 30 | [Cash Drawer Reconciliation](templates/30-cash-drawer-reconciliation.xlsx) | End-of-day till count by denomination, over/short vs POS, deposit amount and daily log. |
 
+## Where people get them (decided Nov 4, 2026)
+
+Both, free:
+
+1. **waypointns.ca/free-tools** – all 30, direct download, no sign-up. Brings visitors to the Waypoint site.
+2. **Gumroad** – each template as a free ($0+) product. Collects buyer emails.
+
+Each Gumroad listing links back to waypointns.ca/free-tools, and the free-tools page links to Gumroad for anyone who wants update emails.
+
 ## How every template works
 
 - **Instructions tab first** – what the file does, step-by-step use, what each tab is for, notes and assumptions.
