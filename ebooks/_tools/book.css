@@ -1,0 +1,216 @@
+/* Shared stylesheet for every ebook. Printed to PDF by headless Chromium. */
+
+:root {
+  --ink: #1d2327;
+  --muted: #5b6670;
+  --accent: #b3261e;        /* maple red */
+  --accent-soft: #fbeceb;
+  --rule: #d9dee3;
+  --note-bg: #f2f5f8;
+  --tip-bg: #eef7f0;
+  --tip-edge: #2e7d4f;
+  --warn-bg: #fff6e6;
+  --warn-edge: #b26a00;
+}
+
+@page {
+  size: Letter;
+  margin: 0.9in 0.95in 0.9in 0.95in;
+  @bottom-center {
+    content: counter(page);
+    font-family: "Inter", "Helvetica Neue", Arial, sans-serif;
+    font-size: 9pt;
+    color: #5b6670;
+  }
+  @top-right {
+    font-family: "Inter", "Helvetica Neue", Arial, sans-serif;
+    font-size: 8pt;
+    color: #8a949c;
+  }
+}
+@page :first {
+  margin: 0;
+  @bottom-center { content: none; }
+  @top-right { content: none; }
+}
+
+html { font-size: 11pt; }
+body {
+  font-family: "Inter", "Helvetica Neue", Arial, sans-serif;
+  color: var(--ink);
+  line-height: 1.55;
+  margin: 0;
+  font-feature-settings: "kern", "liga";
+  hyphens: auto;
+}
+
+/* ---------- Cover ---------- */
+.cover {
+  height: 11in;
+  box-sizing: border-box;
+  padding: 1.6in 1.1in 0.9in 1.1in;
+  background: #1d2327;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  break-after: page;
+  border-top: 0.35in solid var(--accent);
+}
+.cover-series {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 9.5pt;
+  color: #f3b8b3;
+  margin-bottom: 0.5in;
+}
+.cover-title {
+  font-size: 34pt;
+  line-height: 1.12;
+  font-weight: 700;
+  margin: 0 0 0.25in 0;
+  letter-spacing: -0.01em;
+}
+.cover-subtitle {
+  font-size: 15pt;
+  line-height: 1.35;
+  color: #dfe4e8;
+  margin: 0;
+  max-width: 5.6in;
+}
+.cover-rule {
+  width: 1.2in;
+  height: 4px;
+  background: var(--accent);
+  margin: 0.45in 0 0.3in 0;
+}
+.cover-audience { font-size: 11pt; color: #b9c2c9; margin: 0; }
+.cover-foot {
+  margin-top: auto;
+  display: flex;
+  justify-content: space-between;
+  font-size: 9.5pt;
+  color: #9aa5ae;
+}
+
+/* ---------- Copyright / notice page ---------- */
+.copyright {
+  break-after: page;
+  font-size: 9pt;
+  color: var(--muted);
+  padding-top: 4.2in;
+}
+.copyright p { margin: 0 0 0.75em 0; }
+
+/* ---------- Table of contents ---------- */
+.toc { break-after: page; }
+.toc-title {
+  font-size: 22pt;
+  margin: 0 0 0.3in 0;
+  border-bottom: 3px solid var(--accent);
+  padding-bottom: 0.1in;
+}
+.toc ul { list-style: none; padding-left: 0; margin: 0; }
+.toc > ul > li { margin: 0 0 0.55em 0; font-weight: 600; }
+.toc ul ul { padding-left: 1.2em; margin-top: 0.3em; }
+.toc ul ul li { font-weight: 400; font-size: 10pt; margin-bottom: 0.2em; color: var(--muted); }
+.toc a { color: inherit; text-decoration: none; }
+
+/* ---------- Headings ---------- */
+h1, h2, h3, h4 { line-height: 1.25; break-after: avoid; }
+main h1 {
+  break-before: page;
+  font-size: 22pt;
+  margin: 0 0 0.25in 0;
+  padding-bottom: 0.1in;
+  border-bottom: 3px solid var(--accent);
+}
+main h2 { font-size: 14.5pt; margin: 1.5em 0 0.5em 0; color: var(--ink); }
+main h3 { font-size: 11.5pt; margin: 1.3em 0 0.4em 0; color: var(--accent); }
+main h4 { font-size: 10.5pt; margin: 1.1em 0 0.3em 0; }
+
+p { margin: 0 0 0.8em 0; orphans: 3; widows: 3; }
+ul, ol { margin: 0 0 0.9em 0; padding-left: 1.4em; }
+li { margin-bottom: 0.3em; }
+li > p { margin-bottom: 0.3em; }
+strong { font-weight: 650; }
+a { color: var(--accent); text-decoration: none; word-break: break-word; }
+hr { border: none; border-top: 1px solid var(--rule); margin: 1.4em 0; }
+code { font-family: "DejaVu Sans Mono", Menlo, monospace; font-size: 9.5pt; background: var(--note-bg); padding: 0 3px; border-radius: 3px; }
+blockquote {
+  margin: 1em 0;
+  padding: 0.6em 1em;
+  border-left: 4px solid var(--rule);
+  color: #39434b;
+  background: #fafbfc;
+  break-inside: avoid;
+}
+blockquote p:last-child { margin-bottom: 0; }
+
+/* Task-list checkboxes */
+ul.task-list { list-style: none; padding-left: 0.2em; }
+ul.task-list li input[type="checkbox"] { margin: 0 0.55em 0 0; transform: translateY(1px); }
+
+/* ---------- Tables ---------- */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.4em 0 1.1em 0;
+  font-size: 9.6pt;
+  break-inside: auto;
+}
+thead { display: table-header-group; }
+tr { break-inside: avoid; }
+th {
+  text-align: left;
+  background: #1d2327;
+  color: #fff;
+  font-weight: 600;
+  padding: 6px 8px;
+}
+td { padding: 6px 8px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+tbody tr:nth-child(even) td { background: #f8f9fa; }
+table caption { caption-side: bottom; font-size: 8.5pt; color: var(--muted); padding-top: 4px; text-align: left; }
+
+/* ---------- Callout boxes (pandoc fenced divs) ---------- */
+.note, .tip, .warning, .example, .checklist, .template, .worksheet, .keypoints {
+  padding: 0.75em 1em 0.6em 1em;
+  margin: 1em 0 1.2em 0;
+  border-radius: 6px;
+  break-inside: avoid;
+  font-size: 10.2pt;
+}
+.note::before, .tip::before, .warning::before, .example::before,
+.checklist::before, .template::before, .worksheet::before, .keypoints::before {
+  display: block;
+  font-size: 8pt;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 0.4em;
+}
+.note { background: var(--note-bg); border-left: 4px solid #5b6670; }
+.note::before { content: "Note"; color: #5b6670; }
+.tip { background: var(--tip-bg); border-left: 4px solid var(--tip-edge); }
+.tip::before { content: "Tip"; color: var(--tip-edge); }
+.warning { background: var(--warn-bg); border-left: 4px solid var(--warn-edge); }
+.warning::before { content: "Watch out"; color: var(--warn-edge); }
+.example { background: #f6f3fb; border-left: 4px solid #6a4c9c; }
+.example::before { content: "Example"; color: #6a4c9c; }
+.keypoints { background: var(--accent-soft); border-left: 4px solid var(--accent); }
+.keypoints::before { content: "Key points"; color: var(--accent); }
+.checklist { border: 1.5px solid var(--ink); }
+.checklist::before { content: "Checklist"; color: var(--ink); }
+.template, .worksheet { border: 1.5px dashed #8a949c; background: #fff; break-inside: auto; }
+.template::before { content: "Template"; color: var(--muted); }
+.worksheet::before { content: "Worksheet"; color: var(--muted); }
+.note > :last-child, .tip > :last-child, .warning > :last-child, .example > :last-child,
+.checklist > :last-child, .template > :last-child, .worksheet > :last-child, .keypoints > :last-child { margin-bottom: 0.2em; }
+
+/* Write-in lines for worksheets: a paragraph that is only underscores */
+.worksheet p, .template p { line-height: 1.9; }
+
+/* Explicit page break: ::: pagebreak ::: */
+.pagebreak { break-after: page; height: 0; margin: 0; padding: 0; }
+
+/* Footnotes */
+section.footnotes { font-size: 8.8pt; color: var(--muted); border-top: 1px solid var(--rule); margin-top: 2em; }
