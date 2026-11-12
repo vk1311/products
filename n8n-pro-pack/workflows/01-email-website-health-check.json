@@ -1,0 +1,394 @@
+{
+  "name": "Email + website health check",
+  "nodes": [
+    {
+      "id": "9df38a0b-eaed-4dbf-b512-3197f6f8b0ba",
+      "name": "Run check",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "5db89796-cbc0-475c-9b97-41d397c30d78",
+      "name": "Domain to check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Change the domain here, then click Execute workflow\nreturn [{ json: { domain: 'example.com' } }];"
+      }
+    },
+    {
+      "id": "dc0d30b5-f9fc-4bd0-add9-22a5002ddaf2",
+      "name": "Root TXT (SPF)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://dns.google/resolve",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "name",
+              "value": "={{ $('Domain to check').first().json.domain }}"
+            },
+            {
+              "name": "type",
+              "value": "TXT"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "9f810149-b67d-4182-927b-42fd0a39864c",
+      "name": "DMARC",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://dns.google/resolve",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "name",
+              "value": "=_dmarc.{{ $('Domain to check').first().json.domain }}"
+            },
+            {
+              "name": "type",
+              "value": "TXT"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "e16d726e-bdba-423b-a108-fba9bb9e25fc",
+      "name": "MX",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://dns.google/resolve",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "name",
+              "value": "={{ $('Domain to check').first().json.domain }}"
+            },
+            {
+              "name": "type",
+              "value": "MX"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "9407e8d3-bfb3-4c12-a871-73235cea6faf",
+      "name": "Website",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1120,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "=https://{{ $('Domain to check').first().json.domain }}",
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "9b654ded-ef72-4983-be1b-b600b45da06e",
+      "name": "Certificate log (crt.sh)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1344,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://crt.sh/",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "=%.{{ $('Domain to check').first().json.domain }}"
+            },
+            {
+              "name": "output",
+              "value": "json"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "executeOnce": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "bf19334c-5991-4f3a-902f-f06755fef5d7",
+      "name": "DKIM selectors",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const d = $('Domain to check').first().json.domain;\nreturn ['google', 'selector1', 'selector2', 'default', 'k1', 'resend', 'mail', 's1', 'mxvault', 'zoho'].map(s => ({ json: { selector: s, name: s + '._domainkey.' + d } }));"
+      },
+      "executeOnce": true
+    },
+    {
+      "id": "fffa7fcd-ceca-4ad9-839c-15b9a85138bc",
+      "name": "DKIM lookup",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1792,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://dns.google/resolve",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "name",
+              "value": "={{ $json.name }}"
+            },
+            {
+              "name": "type",
+              "value": "TXT"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "a35a9c1d-761b-4cbe-9629-1d1cd33dea3e",
+      "name": "Build report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2016,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const d = $('Domain to check').first().json.domain;\nconst ans = (n) => (($(n).first().json.Answer) || []).map(a => String(a.data).replace(/^\"|\"$/g, '').replace(/\" \"/g, ''));\nconst txt = ans('Root TXT (SPF)'), dm = ans('DMARC'), mx = ans('MX');\nconst spf = txt.filter(t => t.toLowerCase().startsWith('v=spf1'));\nconst dmarc = dm.find(t => t.toLowerCase().startsWith('v=dmarc1')) || '';\nconst policy = (dmarc.match(/p=(\\w+)/i) || [])[1] || '';\nconst sels = $('DKIM selectors').all().map(i => i.json.selector);\nconst dkimFound = $('DKIM lookup').all().map((it, i) => ((it.json.Answer || []).length ? sels[i] : null)).filter(Boolean);\nconst w = $('Website').first().json; const h = Object.fromEntries(Object.entries(w.headers || {}).map(([k, v]) => [k.toLowerCase(), v]));\nconst sec = ['strict-transport-security', 'content-security-policy', 'x-content-type-options', 'x-frame-options', 'referrer-policy'];\nlet subs = [];\ntry { subs = [...new Set(JSON.parse($('Certificate log (crt.sh)').first().json.data || '[]').flatMap(r => String(r.name_value).split('\\n')))].filter(n => n.endsWith(d) && !n.startsWith('*')).sort(); } catch (e) { subs = null; }\nconst checks = [\n  { item: 'SPF record', ok: spf.length === 1, detail: spf.length === 0 ? 'Missing: other servers can send as you' : spf.length > 1 ? 'More than one SPF record (only one is allowed)' : spf[0] },\n  { item: 'DMARC record', ok: !!dmarc, detail: dmarc || 'Missing: no instruction for spoofed mail' },\n  { item: 'DMARC enforced', ok: /^(quarantine|reject)$/i.test(policy), detail: policy ? 'p=' + policy + (policy === 'none' ? ' (monitoring only, spoofed mail still delivered)' : '') : 'n/a' },\n  { item: 'DKIM signing key', ok: dkimFound.length > 0, detail: dkimFound.length ? 'Found: ' + dkimFound.join(', ') : 'None found on common selectors (may use a custom one)' },\n  { item: 'Receives email (MX)', ok: mx.length > 0, detail: mx.join(', ') || 'No MX record' },\n  { item: 'Website loads over HTTPS', ok: w.statusCode >= 200 && w.statusCode < 400, detail: 'Status ' + (w.statusCode || 'no response') },\n  ...sec.map(k => ({ item: 'Header: ' + k, ok: !!h[k], detail: h[k] ? 'Set' : 'Not set' })),\n];\nconst score = checks.filter(c => c.ok).length;\nreturn [{ json: { domain: d, checkedAt: new Date().toISOString(), score: score + ' of ' + checks.length, checks, subdomainsInCertificateLogs: subs === null ? 'crt.sh did not answer, try again later' : subs } }];\n"
+      }
+    },
+    {
+      "id": "2fae9b8d-5fd6-479a-8d56-13912efd9ce9",
+      "name": "How to use",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {
+        "content": "## Email + website health check\n\n1. Open **Domain to check** and type the domain.\n2. Click **Execute workflow**.\n3. Open **Build report** to read the result: SPF, DKIM, DMARC, MX, HTTPS, five security headers, and subdomains seen in public certificate logs.\n\nNo credentials needed. Uses Google public DNS and crt.sh. Nothing is sent anywhere.\n\nTip: run it on a prospect's domain before a sales call, or monthly on your clients' domains.",
+        "color": 4,
+        "width": 420,
+        "height": 300
+      }
+    }
+  ],
+  "connections": {
+    "Run check": {
+      "main": [
+        [
+          {
+            "node": "Domain to check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Domain to check": {
+      "main": [
+        [
+          {
+            "node": "Root TXT (SPF)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Root TXT (SPF)": {
+      "main": [
+        [
+          {
+            "node": "DMARC",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DMARC": {
+      "main": [
+        [
+          {
+            "node": "MX",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MX": {
+      "main": [
+        [
+          {
+            "node": "Website",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Website": {
+      "main": [
+        [
+          {
+            "node": "Certificate log (crt.sh)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Certificate log (crt.sh)": {
+      "main": [
+        [
+          {
+            "node": "DKIM selectors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DKIM selectors": {
+      "main": [
+        [
+          {
+            "node": "DKIM lookup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DKIM lookup": {
+      "main": [
+        [
+          {
+            "node": "Build report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

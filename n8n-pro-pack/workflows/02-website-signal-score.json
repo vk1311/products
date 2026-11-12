@@ -1,0 +1,378 @@
+{
+  "name": "Website signal score (prospect list)",
+  "nodes": [
+    {
+      "id": "26345656-7730-439f-a03b-52383b8567fd",
+      "name": "Run now",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "374fe422-9728-4eda-9d79-79cd09ee9b85",
+      "name": "Settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "s1",
+              "name": "stale_year",
+              "value": 2022,
+              "type": "number"
+            },
+            {
+              "id": "s2",
+              "name": "pause_seconds",
+              "value": 3,
+              "type": "number"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "ade8f366-9bf4-48b9-9cee-18e5a830b420",
+      "name": "Websites to check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// One line per business. Paste from a spreadsheet, or replace this node with a Google Sheets / Airtable / CRM node\n// that outputs items with the same fields: name, website, review_count, google_rating (the last two are optional).\nconst sites = [\n  { name: 'Example Plumbing', website: 'example.com', review_count: 42, google_rating: 4.7 },\n  { name: 'Sample Salon', website: 'https://www.example.org', review_count: 8, google_rating: 4.2 },\n];\nreturn sites.map((s) => {\n  const bare = String(s.website || '').trim().replace(/^[a-z]+:\\/\\//i, '').replace(/\\/+$/, '');\n  return { json: { ...s, website: String(s.website || ''), https_url: bare ? 'https://' + bare : '', http_url: bare ? 'http://' + bare : '' } };\n});"
+      }
+    },
+    {
+      "id": "cb3b328d-6193-4815-bf78-a4911d70bab2",
+      "name": "One site at a time",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      }
+    },
+    {
+      "id": "04c28033-98ff-457b-a63c-8cc3619a92ce",
+      "name": "Fetch homepage over HTTPS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        896,
+        120
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.https_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36"
+            },
+            {
+              "name": "Accept",
+              "value": "text/html,application/xhtml+xml"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000,
+          "redirect": {
+            "redirect": {
+              "followRedirects": true,
+              "maxRedirects": 5
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "84cd43b9-21a2-4acc-8be5-8316904c8b39",
+      "name": "Did HTTPS answer?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1120,
+        120
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ Number($json.statusCode || 0) }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "743bd8b6-0b81-4f7e-8c6a-f3b58ba5e3a1",
+      "name": "Try plain HTTP instead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1344,
+        260
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('One site at a time').item.json.http_url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36"
+            },
+            {
+              "name": "Accept",
+              "value": "text/html,application/xhtml+xml"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000,
+          "redirect": {
+            "redirect": {
+              "followRedirects": true,
+              "maxRedirects": 5
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "b2113381-4339-41d0-869d-16c2585d3e13",
+      "name": "Detect tech and score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1568,
+        120
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "language": "javaScript",
+        "jsCode": "// SIGNAL SCORE: 0-100. Higher = more likely to need a better website, booking or quoting tool.\n// Every point is listed here so the score is never a black box.\n// A. No usable website: no_website 60 | social_only 50 | site_down 45\n// B. Website gaps (only when the page loaded): no_booking_or_quote 18 | no_form 15 | no_viewport 12 |\n//    no_https 10 | stale_copyright 10 | no_crm_or_chat 8 | diy_builder 6 | no_tel_link 5 | no_analytics 4 |\n//    has_field_software -8 (already uses Jobber or Housecall Pro)\n// C. Demand: reviews >= 100: 12 | >= 40: 8 | >= 15: 4 | google rating >= 4.5: 3\n// score_reliable = false when a bot wall blocked the check or the page is a JavaScript-only shell.\nconst site = $('One site at a time').item.json;\nconst settings = $('Settings').first().json;\nconst STALE_YEAR = Number(settings.stale_year || 2022);\nconst THIS_YEAR = new Date().getFullYear();\nconst httpsRes = $('Fetch homepage over HTTPS').item.json || {};\nconst httpsStatus = Number(httpsRes.statusCode || 0);\nconst httpsOk = httpsStatus >= 200 && httpsStatus < 400;\nconst res = httpsStatus ? httpsRes : ($json || {});\nconst status = Number(res.statusCode || 0);\nconst headers = res.headers || {};\nconst raw = typeof res.body === 'string' ? res.body : (typeof res.data === 'string' ? res.data : '');\nconst html = raw.toLowerCase();\nconst errObj = res.error || httpsRes.error || {};\nconst errMsg = String(errObj.message || errObj.code || res.message || '').slice(0, 200);\nconst website = String(site.website || '');\nconst hdr = (k) => String(headers[k] || headers[k.toLowerCase()] || '').toLowerCase();\nconst has = (...xs) => xs.some((x) => html.includes(x));\nconst textLen = html.replace(/<script[\\s\\S]*?<\\/script>/g, '').replace(/<style[\\s\\S]*?<\\/style>/g, '').replace(/<[^>]+>/g, ' ').replace(/\\s+/g, ' ').trim().length;\nconst signals = [], breakdown = [];\nlet score = 0;\nconst add = (name, pts) => { signals.push(name); if (pts) { score += pts; breakdown.push(name + ' ' + (pts > 0 ? '+' : '') + pts); } };\nconst generatorMatch = raw.match(/<meta[^>]+name=[\"']generator[\"'][^>]*content=[\"']([^\"']+)[\"']/i) || raw.match(/<meta[^>]+content=[\"']([^\"']+)[\"'][^>]*name=[\"']generator[\"']/i);\nconst generator = generatorMatch ? generatorMatch[1].slice(0, 80) : '';\nconst gen = generator.toLowerCase(), server = hdr('server'), link = hdr('link');\nconst PLATFORMS = [\n  ['Wix', () => has('wixstatic.com', 'parastorage.com', 'wix-code') || gen.includes('wix') || server.includes('pepyaka') || !!hdr('x-wix-request-id')],\n  ['Squarespace', () => has('static1.squarespace.com', 'squarespace-cdn.com', 'squarespace.com/') || gen.includes('squarespace')],\n  ['Shopify', () => has('cdn.shopify.com', 'shopify.theme', 'myshopify.com') || !!hdr('x-shopid') || !!hdr('x-shopify-stage')],\n  ['GoDaddy Website Builder', () => has('img1.wsimg.com', 'websites.godaddy.com', 'godaddysites.com') || gen.includes('go daddy') || gen.includes('godaddy') || gen.includes('starfield')],\n  ['Weebly', () => has('weebly.com', 'editmysite.com', 'weeblycloud.com') || gen.includes('weebly')],\n  ['Webflow', () => has('data-wf-page', 'data-wf-site', 'webflow.js', 'website-files.com') || gen.includes('webflow')],\n  ['Duda', () => has('irp.cdn-website.com', 'cdn-website.com', 'multiscreensite.com', 'dudaone') || gen.includes('duda')],\n  ['WordPress', () => has('wp-content/', 'wp-includes/', 'wp-json') || gen.includes('wordpress') || link.includes('api.w.org')],\n];\nlet platform = 'custom/unknown';\nfor (const [name, test] of PLATFORMS) { if (test()) { platform = name; break; } }\nconst BOOKING = [['Calendly', ['calendly.com']], ['Acuity', ['acuityscheduling.com', '.as.me/', 'app.acuityscheduling']],\n  ['Square Appointments', ['squareup.com/appointments', 'square.site/book', 'app.squareup.com/appointments']], ['Jobber', ['getjobber.com', 'clienthub.getjobber', 'jobber.com/']],\n  ['Housecall Pro', ['housecallpro.com']], ['Setmore', ['setmore.com']], ['SimplyBook', ['simplybook.me', 'simplybook.it']], ['Booksy', ['booksy.com']],\n  ['Fresha', ['fresha.com']], ['Jane App', ['janeapp.com', 'janeapp.ca']]];\nconst CRM_CHAT = [['HubSpot', ['js.hs-scripts.com', 'hsforms', 'hs-analytics', 'hubspot.com', 'hs-banner']], ['Mailchimp', ['list-manage.com', 'chimpstatic.com', 'mailchimp.com']],\n  ['Tawk', ['embed.tawk.to', 'tawk.to']], ['Intercom', ['widget.intercom.io', 'intercomcdn.com', 'intercom.io']]];\nconst ANALYTICS = [['Facebook pixel', ['fbevents.js', \"fbq('init'\", 'fbq(\"init\"']], ['Google Analytics', ['google-analytics.com/analytics.js', 'gtag/js?id=g-', 'gtag/js?id=ua-', \"gtag('config'\", 'gtag(\"config\"']],\n  ['Google Tag Manager', ['googletagmanager.com/gtm.js', 'googletagmanager.com/ns.html', 'gtm-']]];\nconst detect = (list) => list.filter(([, needles]) => needles.some((n) => html.includes(n))).map(([name]) => name);\nconst social = /(^|\\/\\/|\\.)(facebook\\.com|fb\\.com|instagram\\.com|linktr\\.ee)/i.test(website);\nconst noWebsite = !website.trim();\nconst challenge = textLen < 2000 && /just a moment|cf-challenge|cf_chl|challenge-platform|captcha|access denied|attention required/.test(html);\nconst blocked = !noWebsite && !social && ([401, 403, 406, 429].includes(status) || (status === 503 && challenge) || challenge || /timeout|timed out|etimedout|esockettimedout|aborted/i.test(errMsg));\nconst dead = !noWebsite && !social && !blocked && (!status || status === 404 || status === 410 || status >= 500);\nconst shell = !noWebsite && !social && !blocked && !dead && textLen < 300;\nconst loaded = !noWebsite && !social && !blocked && !dead && !shell;\nlet hasViewport = null, hasForm = null, hasBookingOrQuote = null, hasTel = null, copyrightYear = null;\nlet bookingTools = [], crmChatTools = [], analyticsTools = [];\nif (loaded) {\n  bookingTools = detect(BOOKING); crmChatTools = detect(CRM_CHAT); analyticsTools = detect(ANALYTICS);\n  hasViewport = /<meta[^>]+name=[\"']?viewport/.test(html);\n  hasForm = html.includes('<form') || has('typeform.com', 'jotform', 'formspree', 'wpforms', 'gravityform', 'wpcf7', 'hsforms', 'cognitoforms', 'wufoo', 'wix-forms', 'docs.google.com/forms', 'forms.gle', 'formstack');\n  hasBookingOrQuote = bookingTools.length > 0 || has('book now', 'book online', 'book an appointment', 'schedule service', 'schedule an appointment', 'request service', 'request a quote', 'get a quote', 'free quote', 'request a free', 'free estimate', 'get an estimate', 'request an estimate', 'online booking', 'reserve now');\n  hasTel = html.includes('href=\"tel:') || html.includes(\"href='tel:\") || html.includes('href=tel:');\n  const years = []; const re = /(?:\u00a9|&copy;|&#169;|copyright)[^0-9<]{0,20}((?:19|20)\\d{2})(?:\\s*(?:-|\u2013|\u2014|&ndash;|&#8211;|to)\\s*((?:19|20)\\d{2}))?/gi; let m;\n  while ((m = re.exec(raw)) !== null) { const y = Number(m[2] || m[1]); if (y >= 1995 && y <= THIS_YEAR + 1) years.push(y); }\n  copyrightYear = years.length ? Math.max(...years) : null;\n}\nif (noWebsite) add('no_website', 60); else if (social) add('social_only', 50); else if (dead) add('site_down', 45);\nelse if (blocked) add('check_blocked', 0); else if (shell) add('js_only_page', 0);\nif (!noWebsite && !social && !httpsOk && status >= 200 && status < 400) add('no_https', 10);\nif (loaded) {\n  if (!hasBookingOrQuote) add('no_booking_or_quote', 18);\n  if (!hasForm) add('no_form', 15);\n  if (!hasViewport) add('no_viewport', 12);\n  if (copyrightYear !== null && copyrightYear <= STALE_YEAR) add('stale_copyright', 10);\n  if (!crmChatTools.length) add('no_crm_or_chat', 8);\n  if (['Wix', 'Squarespace', 'GoDaddy Website Builder', 'Weebly', 'Duda'].includes(platform)) add('diy_builder', 6);\n  if (!hasTel) add('no_tel_link', 5);\n  if (!analyticsTools.length) add('no_analytics', 4);\n  if (bookingTools.includes('Jobber') || bookingTools.includes('Housecall Pro')) add('has_field_software', -8);\n}\nconst reviews = Number(site.review_count || 0), rating = Number(site.google_rating || 0);\nif (reviews >= 100) add('reviews_100plus', 12); else if (reviews >= 40) add('reviews_40plus', 8); else if (reviews >= 15) add('reviews_15plus', 4);\nif (rating >= 4.5) add('rating_4_5plus', 3);\nscore = Math.max(0, Math.min(100, score));\nreturn { json: { name: site.name, website, http_status: status || null, https_ok: httpsOk, fetch_error: errMsg,\n  platform: loaded || blocked || shell ? platform : '', generator, booking_tools: bookingTools.join(', '), crm_chat_tools: crmChatTools.join(', '),\n  analytics_tools: analyticsTools.join(', '), has_viewport: hasViewport, has_form: hasForm, has_booking_or_quote: hasBookingOrQuote, has_tel_link: hasTel,\n  copyright_year: copyrightYear, signals: signals.join(', '), signal_score: score, score_reliable: !blocked && !shell, score_breakdown: breakdown.join(', '),\n  checked_at: new Date().toISOString() } };\n"
+      }
+    },
+    {
+      "id": "85f02d44-9932-4ce6-87a2-17f38e6e505d",
+      "name": "Polite pause",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1792,
+        120
+      ],
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": "={{ $('Settings').first().json.pause_seconds }}",
+        "unit": "seconds"
+      },
+      "webhookId": "77d7ef86-a42a-440e-b4e8-cff87e8a8c5b"
+    },
+    {
+      "id": "de6a0bc7-3af5-4a92-b0e1-83139e4ccfa6",
+      "name": "Results, highest score first",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        -160
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "return $('Detect tech and score').all().sort((a, b) => b.json.signal_score - a.json.signal_score);"
+      }
+    },
+    {
+      "id": "373d89f8-843e-4695-b405-e34f1c8938f4",
+      "name": "How to use",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        224,
+        300
+      ],
+      "parameters": {
+        "content": "## Website signal score\n\n1. Put your list in **Websites to check** (or swap that node for Google Sheets).\n2. Click **Execute workflow**.\n3. Open **Results, highest score first**.\n\nEach site is opened once (15 s timeout, 3 s pause between sites). It detects the platform (Wix, Squarespace, WordPress...), booking, CRM/chat and analytics tools, and scores 0-100. Higher = more gaps a better site, booking or quoting tool would fix. Every point is listed at the top of **Detect tech and score**.\n\nRows with score_reliable = false were blocked by a bot wall or are JavaScript-only pages: check those by hand.\n\nUse it to prioritise who to talk to, not to send bulk email. In Canada, CASL applies to commercial email.",
+        "color": 4,
+        "width": 460,
+        "height": 380
+      }
+    }
+  ],
+  "connections": {
+    "Run now": {
+      "main": [
+        [
+          {
+            "node": "Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Settings": {
+      "main": [
+        [
+          {
+            "node": "Websites to check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Websites to check": {
+      "main": [
+        [
+          {
+            "node": "One site at a time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "One site at a time": {
+      "main": [
+        [
+          {
+            "node": "Results, highest score first",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fetch homepage over HTTPS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch homepage over HTTPS": {
+      "main": [
+        [
+          {
+            "node": "Did HTTPS answer?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Did HTTPS answer?": {
+      "main": [
+        [
+          {
+            "node": "Detect tech and score",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Try plain HTTP instead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Try plain HTTP instead": {
+      "main": [
+        [
+          {
+            "node": "Detect tech and score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect tech and score": {
+      "main": [
+        [
+          {
+            "node": "Polite pause",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Polite pause": {
+      "main": [
+        [
+          {
+            "node": "One site at a time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

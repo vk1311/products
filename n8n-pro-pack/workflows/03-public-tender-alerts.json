@@ -1,0 +1,329 @@
+{
+  "name": "Public tender alerts (CanadaBuys)",
+  "nodes": [
+    {
+      "id": "f6dd4051-6fc0-4450-8a35-422a3aa27484",
+      "name": "Run now",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "59a0653b-b429-4f52-8377-4ee57b15a3e2",
+      "name": "Daily 9:43am (off)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        200
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "43 9 * * 1-5"
+            }
+          ]
+        }
+      },
+      "disabled": true
+    },
+    {
+      "id": "f7dbb68b-e815-4d29-80e1-52f0bb083004",
+      "name": "Settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        224,
+        100
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "t1",
+              "name": "canadabuys_csv_url",
+              "value": "https://canadabuys.canada.ca/opendata/pub/openTenderNotice-ouvertAvisAppelOffres.csv",
+              "type": "string"
+            },
+            {
+              "id": "t2",
+              "name": "provinces",
+              "value": "NS,NB,PE,NL",
+              "type": "string"
+            },
+            {
+              "id": "t3",
+              "name": "max_per_digest",
+              "value": 30,
+              "type": "number"
+            },
+            {
+              "id": "t4",
+              "name": "sender_name",
+              "value": "Your Business Tender Alerts",
+              "type": "string"
+            },
+            {
+              "id": "t5",
+              "name": "postal_address",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "0ae9c8c2-c985-4e8e-8ffe-b947bda0f59a",
+      "name": "Download CanadaBuys open tenders",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        448,
+        100
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Settings').first().json.canadabuys_csv_url }}",
+        "options": {
+          "timeout": 120000,
+          "redirect": {
+            "redirect": {
+              "followRedirects": true,
+              "maxRedirects": 5
+            }
+          },
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "executeOnce": true
+    },
+    {
+      "id": "c8b3633b-2e37-48bb-bca5-fc302737b800",
+      "name": "Read the CSV",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        100
+      ],
+      "parameters": {
+        "operation": "csv",
+        "binaryPropertyName": "data",
+        "options": {
+          "headerRow": true,
+          "enableBOM": true,
+          "relaxQuotes": true
+        }
+      }
+    },
+    {
+      "id": "daedbb57-26c8-4acc-8eef-9859f41ec9e7",
+      "name": "Keep tenders in my provinces",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        100
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Keep open CanadaBuys notices delivered to (or bought from) the provinces you list in Settings,\n// plus national \"*Canada\" ones (tagged CANADA so a subscriber can opt in). One clean item per tender.\nconst REGIONS = {\n  NS: ['nova scotia', 'halifax', 'dartmouth', 'greenwood', 'shearwater', 'sydney', 'truro', 'kentville', 'yarmouth', 'bridgewater', 'antigonish', 'new glasgow'],\n  NB: ['new brunswick', 'oromocto', 'gagetown', 'fredericton', 'moncton', 'saint john', 'shediac', 'bathurst', 'miramichi', 'edmundston', 'dieppe'],\n  PE: ['prince edward island', 'charlottetown', 'summerside'],\n  NL: ['newfoundland', \"st. john's\", 'st johns', 'gander', 'goose bay', 'corner brook', 'labrador'],\n  QC: ['quebec', 'qu\u00e9bec', 'montreal', 'montr\u00e9al', 'gatineau', 'laval'],\n  ON: ['ontario', 'ottawa', 'toronto', 'kingston', 'hamilton', 'london', 'sudbury', 'thunder bay'],\n  MB: ['manitoba', 'winnipeg', 'brandon'],\n  SK: ['saskatchewan', 'regina', 'saskatoon'],\n  AB: ['alberta', 'calgary', 'edmonton', 'red deer'],\n  BC: ['british columbia', 'vancouver', 'victoria', 'esquimalt', 'kelowna', 'nanaimo'],\n  YT: ['yukon', 'whitehorse'], NT: ['northwest territories', 'yellowknife'], NU: ['nunavut', 'iqaluit'],\n  CANADA: ['canada'],\n};\nconst WANT = String($('Settings').first().json.provinces || 'NS,NB,PE,NL').split(',').map((x) => x.trim().toUpperCase()).concat(['CANADA']);\nconst CATEGORY = { GD: 'Goods', SRV: 'Services', CNST: 'Construction', SRVTGD: 'Services related to goods' };\nconst now = Date.now(), seen = new Set(), out = [];\nconst clean = (s) => String(s || '').replace(/<br\\s*\\/?>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\\s+/g, ' ').trim();\nfor (const it of $input.all()) {\n  const r = {};\n  for (const k of Object.keys(it.json || {})) r[k.replace(/^\ufeff/, '').replace(/^\"|\"$/g, '').trim()] = it.json[k];\n  const g = (k) => String(r[k] == null ? '' : r[k]).trim();\n  const id = g('referenceNumber-numeroReference');\n  if (!id || seen.has(id)) continue;\n  if (g('tenderStatus-appelOffresStatut-eng') && g('tenderStatus-appelOffresStatut-eng') !== 'Open') continue;\n  const closing = g('tenderClosingDate-appelOffresDateCloture');\n  if (closing && Date.parse(closing) && Date.parse(closing) < now) continue;\n  let places = g('regionsOfDelivery-regionsLivraison-eng').split(/[\\r\\n]+/).map((x) => x.replace(/^\\*/, '').trim()).filter(Boolean);\n  if (!places.length) places = [g('contractingEntityAddressProvince-entiteContractanteAdresseProvince-eng'), g('contractingEntityAddressCity-entiteContractanteAdresseVille-eng')].filter(Boolean);\n  const codes = [];\n  for (const p of places) {\n    const pl = p.toLowerCase();\n    for (const code of Object.keys(REGIONS)) {\n      if (codes.includes(code) || !WANT.includes(code)) continue;\n      if (REGIONS[code].some((n) => pl === n || pl.startsWith(n))) codes.push(code);\n    }\n  }\n  if (!codes.length) continue;\n  seen.add(id);\n  const title = clean(g('title-titre-eng'));\n  const description = clean(g('tenderDescription-descriptionAppelOffres-eng')).slice(0, 700);\n  const gsin = clean(g('gsinDescription-nibsDescription-eng').replace(/\\*/g, ' '));\n  const unspsc = clean(g('unspscDescription-eng').replace(/\\*/g, ' '));\n  const cat = g('procurementCategory-categorieApprovisionnement').split(/[\\r\\n]+/).map((x) => CATEGORY[x.replace(/^\\*/, '').trim()] || x.replace(/^\\*/, '').trim()).filter(Boolean).join(', ');\n  const solicitation = g('solicitationNumber-numeroSollicitation');\n  const url = g('noticeURL-URLavis-eng') || 'https://canadabuys.canada.ca/en/tender-opportunities?search_filter=' + encodeURIComponent(solicitation || id);\n  out.push({ json: { tender_id: id, title, description, category: cat, buyer: g('contractingEntityName-nomEntitContractante-eng'),\n    published: g('publicationDate-datePublication'), closing_date: closing, regions: codes, region_names: places.join(', '), url,\n    search_text: (title + ' ' + description + ' ' + gsin + ' ' + unspsc + ' ' + cat).toLowerCase() } });\n}\nreturn out;\n"
+      }
+    },
+    {
+      "id": "162e27e1-8a26-4693-b23e-3b4df900238a",
+      "name": "Subscribers",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        336,
+        300
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Your subscribers. Replace these examples, or swap this node for Google Sheets / a data table.\n// keywords: comma list of word starts (\"landscap\" catches landscaping). regions: NS,NB,PE,NL,QC,ON,MB,SK,AB,BC,YT,NT,NU,CANADA\nreturn [\n  { name: 'Sample Landscaping', email: 'owner@example.com', keywords: 'landscap, snow, grounds', regions: 'NS,CANADA', active: true },\n  { name: 'Sample Electric', email: 'office@example.com', keywords: 'electric, lighting, generator', regions: 'NS,NB', active: true },\n].map((s) => ({ json: s }));"
+      }
+    },
+    {
+      "id": "0e729459-1b32-4981-8bc2-891db4e9ebbc",
+      "name": "Match tenders to subscribers",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        100
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// Pair every subscriber with every tender that matches one of their keywords AND one of their regions.\n// Keywords match at the start of a word: \"landscap\" catches \"landscaping\", \"electric\" catches \"electrical\".\n// Tenders already sent to a subscriber are skipped (remembered in this workflow's static data,\n// which n8n keeps between production runs; manual test runs do not save it).\nconst tenders = $input.all().map((i) => i.json);\nconst subs = $('Subscribers').all().map((i) => i.json).filter((s) => s && s.email && s.active !== false);\nconst sent = $getWorkflowStaticData('global'); sent.keys = sent.keys || {};\nconst esc = (s) => s.replace(/[.*+?^$()|[\\]\\\\{}]/g, '\\\\$&');\nconst out = [];\nfor (const s of subs) {\n  const email = String(s.email).trim().toLowerCase();\n  const kws = String(s.keywords || '').split(',').map((k) => k.trim().toLowerCase()).filter(Boolean);\n  const regions = String(s.regions || '').split(',').map((r) => r.trim().toUpperCase()).filter(Boolean);\n  if (!kws.length || !regions.length) continue;\n  const tests = kws.map((k) => ({ k, re: new RegExp('(^|[^a-z0-9])' + esc(k)) }));\n  for (const t of tenders) {\n    const key = email + '|' + t.tender_id;\n    if (sent.keys[key]) continue;\n    const regionHit = (t.regions || []).filter((r) => regions.includes(r));\n    if (!regionHit.length) continue;\n    const hits = tests.filter((x) => x.re.test(t.search_text || '')).map((x) => x.k);\n    if (!hits.length) continue;\n    out.push({ json: { seen_key: key, subscriber_name: s.name || '', subscriber_email: email, matched_keywords: hits.join(', '),\n      tender_id: t.tender_id, title: t.title, category: t.category, buyer: t.buyer, closing_date: t.closing_date, region_names: t.region_names, url: t.url } });\n  }\n}\nreturn out;\n"
+      }
+    },
+    {
+      "id": "9dfa7aa8-4572-4af5-b895-26f6b26d6b64",
+      "name": "Build per-subscriber digests",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        100
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "// One digest per subscriber: soonest-closing first, capped at max_per_digest.\n// Anything over the cap is not marked as sent, so it rolls into the next digest.\nconst settings = $('Settings').first().json;\nconst MAX = Number(settings.max_per_digest || 30);\nconst h = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\"/g, '&quot;');\nconst day = (d) => (String(d || '').slice(0, 10) || 'not stated');\nconst groups = {};\nfor (const it of $input.all()) { const m = it.json; (groups[m.subscriber_email] = groups[m.subscriber_email] || { name: m.subscriber_name, rows: [] }).rows.push(m); }\nconst today = new Date().toISOString().slice(0, 10);\nconst sent = $getWorkflowStaticData('global'); sent.keys = sent.keys || {};\nconst out = [];\nfor (const email of Object.keys(groups)) {\n  const g = groups[email];\n  const rows = g.rows.sort((a, b) => String(a.closing_date || '9999').localeCompare(String(b.closing_date || '9999')));\n  const shown = rows.slice(0, MAX), extra = rows.length - shown.length;\n  const items = shown.map((t) => '<tr><td style=\"padding:10px 8px;border-bottom:1px solid #e5e5e5;vertical-align:top\"><a href=\"' + h(t.url) + '\" style=\"color:#0b5cad;font-weight:600;text-decoration:none\">' + h(t.title) + '</a>' +\n    '<div style=\"color:#555;font-size:13px;margin-top:4px\">' + h(t.buyer) + (t.category ? ' &middot; ' + h(t.category) : '') + '</div>' +\n    '<div style=\"color:#777;font-size:12px;margin-top:4px\">Delivery: ' + h(t.region_names) + ' &middot; Matched: ' + h(t.matched_keywords) + '</div></td>' +\n    '<td style=\"padding:10px 8px;border-bottom:1px solid #e5e5e5;vertical-align:top;white-space:nowrap;font-size:13px\">' + h(day(t.closing_date)) + '</td></tr>').join('');\n  const html = '<div style=\"font-family:Arial,Helvetica,sans-serif;max-width:680px;color:#222\"><h2 style=\"margin:0 0 4px\">' + shown.length + ' new tender' + (shown.length === 1 ? '' : 's') + ' for you</h2>' +\n    '<p style=\"margin:0 0 16px;color:#555\">Hi ' + h(g.name || 'there') + ', these public tenders match your trades and regions. Soonest closing first.</p>' +\n    '<table style=\"border-collapse:collapse;width:100%\"><tr><th align=\"left\" style=\"padding:6px 8px;border-bottom:2px solid #222\">Tender</th><th align=\"left\" style=\"padding:6px 8px;border-bottom:2px solid #222\">Closes</th></tr>' + items + '</table>' +\n    (extra > 0 ? '<p style=\"color:#555\">' + extra + ' more matched and will come in your next digest.</p>' : '') +\n    '<p style=\"color:#888;font-size:12px;margin-top:24px\">Source: CanadaBuys open tender notices (Open Government Licence - Canada). Always confirm details and deadlines on the official notice.<br>' +\n    h(settings.sender_name) + (settings.postal_address ? ' &middot; ' + h(settings.postal_address) : '') + '<br>To stop these emails, reply with STOP.</p></div>';\n  // Mark as sent only in production runs, so test runs can be repeated.\n  if ($execution.mode !== 'manual') for (const t of shown) sent.keys[t.seen_key] = today;\n  out.push({ json: { to: email, subject: shown.length + ' new tender' + (shown.length === 1 ? '' : 's') + ' matching your trades (' + today + ')', html, tender_count: shown.length, held_for_next_digest: extra } });\n}\nreturn out;\n"
+      }
+    },
+    {
+      "id": "b25e0a3c-679f-479d-a794-977831511b63",
+      "name": "Send email (connect your account)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1568,
+        100
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "8c863a76-6d18-4466-8a58-6d0f407dd5ac",
+      "name": "How to use",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        224,
+        420
+      ],
+      "parameters": {
+        "content": "## Public tender alerts (CanadaBuys)\n\nDownloads the CanadaBuys open tender notices CSV (Government of Canada open data), keeps tenders delivered to the provinces in **Settings**, matches them to each subscriber's keywords and regions, skips ones already sent, and builds one HTML digest per subscriber.\n\n1. Edit **Settings** (provinces, sender name, your mailing address).\n2. Replace the examples in **Subscribers**.\n3. Run it and open **Build per-subscriber digests** to read the emails.\n4. Replace **Send email** with your Gmail, Outlook, SMTP or Resend node: to = {{ $json.to }}, subject = {{ $json.subject }}, HTML = {{ $json.html }}.\n5. Turn on the daily trigger and activate.\n\nAlready-sent tenders are remembered only in production runs. CASL: email only people who signed up, and fill in your mailing address.",
+        "color": 2,
+        "width": 520,
+        "height": 420
+      }
+    }
+  ],
+  "connections": {
+    "Settings": {
+      "main": [
+        [
+          {
+            "node": "Subscribers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Subscribers": {
+      "main": [
+        [
+          {
+            "node": "Download CanadaBuys open tenders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download CanadaBuys open tenders": {
+      "main": [
+        [
+          {
+            "node": "Read the CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read the CSV": {
+      "main": [
+        [
+          {
+            "node": "Keep tenders in my provinces",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keep tenders in my provinces": {
+      "main": [
+        [
+          {
+            "node": "Match tenders to subscribers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Match tenders to subscribers": {
+      "main": [
+        [
+          {
+            "node": "Build per-subscriber digests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build per-subscriber digests": {
+      "main": [
+        [
+          {
+            "node": "Send email (connect your account)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run now": {
+      "main": [
+        [
+          {
+            "node": "Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily 9:43am (off)": {
+      "main": [
+        [
+          {
+            "node": "Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}
